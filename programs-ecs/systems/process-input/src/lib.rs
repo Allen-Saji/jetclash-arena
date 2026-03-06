@@ -89,11 +89,10 @@ pub mod process_input {
         {
             player.primary_ammo -= 1;
             player.primary_cooldown_tick = current_tick + PRIMARY_COOLDOWN_TICKS;
-            let owner = if player.player_authority == match_state.player1 { 0 } else { 1 };
             spawn_projectile(
                 projectile_pool, player.pos_x, player.pos_y - 2000,
                 if player.facing_right { PRIMARY_SPEED / 30 } else { -(PRIMARY_SPEED / 30) },
-                0, PRIMARY_DAMAGE, owner, false, PRIMARY_TTL_TICKS,
+                0, PRIMARY_DAMAGE, player.player_index, false, PRIMARY_TTL_TICKS,
             );
             if player.primary_ammo == 0 {
                 player.primary_reload_tick = current_tick + PRIMARY_RELOAD_TICKS;
@@ -109,11 +108,10 @@ pub mod process_input {
         {
             player.secondary_ammo -= 1;
             player.secondary_cooldown_tick = current_tick + SECONDARY_COOLDOWN_TICKS;
-            let owner = if player.player_authority == match_state.player1 { 0 } else { 1 };
             spawn_projectile(
                 projectile_pool, player.pos_x, player.pos_y - 2000,
                 if player.facing_right { SECONDARY_SPEED / 30 } else { -(SECONDARY_SPEED / 30) },
-                0, SECONDARY_DAMAGE, owner, true, SECONDARY_TTL_TICKS,
+                0, SECONDARY_DAMAGE, player.player_index, true, SECONDARY_TTL_TICKS,
             );
             if player.secondary_ammo == 0 {
                 player.secondary_reload_tick = current_tick + SECONDARY_RELOAD_TICKS;

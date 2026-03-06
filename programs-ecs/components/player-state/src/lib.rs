@@ -35,6 +35,8 @@ pub struct PlayerState {
     pub kills: u16,
     pub deaths: u16,
     pub score: u32,
+    /// 0 = player1, 1 = player2
+    pub player_index: u8,
 }
 
 impl Default for PlayerState {
@@ -67,6 +69,7 @@ impl Default for PlayerState {
             kills: 0,
             deaths: 0,
             score: 0,
+            player_index: 0,
         }
     }
 }

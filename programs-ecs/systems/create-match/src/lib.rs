@@ -36,11 +36,13 @@ pub mod create_match {
         let p1 = &mut ctx.accounts.player_state_p1;
         p1.pos_x = args.p1_spawn_x;
         p1.pos_y = args.p1_spawn_y;
+        p1.player_index = 0;
         reset_player(p1, true);
 
         let p2 = &mut ctx.accounts.player_state_p2;
         p2.pos_x = args.p2_spawn_x;
         p2.pos_y = args.p2_spawn_y;
+        p2.player_index = 1;
         reset_player(p2, false);
 
         for proj in ctx.accounts.projectile_pool.projectiles.iter_mut() {
@@ -77,7 +79,13 @@ fn reset_player(p: &mut PlayerState, facing_right: bool) {
     p.is_invincible = true;
     p.invincible_until_tick = 90;
     p.dash_active = false;
+    p.dash_cooldown_tick = 0;
+    p.primary_cooldown_tick = 0;
+    p.secondary_cooldown_tick = 0;
+    p.primary_reload_tick = 0;
+    p.secondary_reload_tick = 0;
     p.speed_multiplier = 100;
+    p.speed_buff_until_tick = 0;
     p.kills = 0;
     p.deaths = 0;
     p.score = 0;
