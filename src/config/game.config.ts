@@ -11,6 +11,8 @@ export const PHYSICS_CONFIG: Phaser.Types.Core.PhysicsConfig = {
   arcade: {
     gravity: { x: 0, y: 800 },
     debug: false,
+    fps: 300,
+    fixedStep: false,
   },
 };
 
@@ -19,11 +21,12 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   parent: 'game-container',
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
-  backgroundColor: '#1a1a2e',
+  backgroundColor: '#b5875a',
   physics: PHYSICS_CONFIG,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    expandParent: true,
   },
   pixelArt: true,
   antialias: false,
