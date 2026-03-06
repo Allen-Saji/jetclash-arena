@@ -36,9 +36,10 @@ export class Player {
 
   // Dash
   private lastDash: number = 0;
+  private dashActive: boolean = false;
   private static DASH_COOLDOWN = 3000; // ms
   private static DASH_SPEED = 600;
-  private static DASH_DURATION = 180; // ms
+  private static DASH_DURATION = 200; // ms
 
   constructor(scene: Phaser.Scene, config: PlayerConfig) {
     this.scene = scene;
@@ -48,15 +49,15 @@ export class Player {
 
     // Create sprite
     this.sprite = scene.add.sprite(config.spawnX, config.spawnY, `${this.animPrefix}-idle-1`);
-    this.sprite.setScale(1.8);
+    this.sprite.setScale(1.3);
     this.sprite.setFlipX(!this.facingRight);
 
     // Physics
     scene.physics.add.existing(this.sprite);
     this.body = this.sprite.body as Phaser.Physics.Arcade.Body;
     this.body.setCollideWorldBounds(true);
-    this.body.setSize(50, 60);
-    this.body.setOffset(25, 20);
+    this.body.setSize(40, 50);
+    this.body.setOffset(55, 58);
     this.body.setMaxVelocity(PLAYER_PHYSICS.moveSpeed * 1.5, 600);
 
     // Input
@@ -64,7 +65,7 @@ export class Player {
 
     // Smoke effect
     this.smokeEmitter = scene.add.sprite(0, 0, 'smoke-1');
-    this.smokeEmitter.setScale(0.8);
+    this.smokeEmitter.setScale(0.6);
     this.smokeEmitter.setVisible(false);
 
     // Start idle animation
@@ -94,19 +95,23 @@ export class Player {
     const speed = PLAYER_PHYSICS.moveSpeed * this.speedMultiplier;
     let moving = false;
 
-    // Horizontal movement
-    if (this.keys.left.isDown) {
-      this.body.setVelocityX(-speed);
-      this.facingRight = false;
-      this.sprite.setFlipX(true);
-      moving = true;
-    } else if (this.keys.right.isDown) {
-      this.body.setVelocityX(speed);
-      this.facingRight = true;
-      this.sprite.setFlipX(false);
-      moving = true;
+    // Horizontal movement (skip if dashing)
+    if (!this.dashActive) {
+      if (this.keys.left.isDown) {
+        this.body.setVelocityX(-speed);
+        this.facingRight = false;
+        this.sprite.setFlipX(true);
+        moving = true;
+      } else if (this.keys.right.isDown) {
+        this.body.setVelocityX(speed);
+        this.facingRight = true;
+        this.sprite.setFlipX(false);
+        moving = true;
+      } else {
+        this.body.setVelocityX(0);
+      }
     } else {
-      this.body.setVelocityX(0);
+      moving = true;
     }
 
     // Jetpack
@@ -118,16 +123,18 @@ export class Player {
     }
 
     // Dash
-    if (Phaser.Input.Keyboard.JustDown(this.keys.utility)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.utility) && !this.dashActive) {
       const now = this.scene.time.now;
       if (now - this.lastDash >= Player.DASH_COOLDOWN) {
         this.lastDash = now;
+        this.dashActive = true;
         sfx.dash();
         const dashVx = this.facingRight ? Player.DASH_SPEED : -Player.DASH_SPEED;
         this.body.setVelocityX(dashVx);
         this.isInvincible = true;
         this.sprite.setAlpha(0.5);
         this.scene.time.delayedCall(Player.DASH_DURATION, () => {
+          this.dashActive = false;
           this.isInvincible = false;
           this.sprite.setAlpha(1);
         });
@@ -169,8 +176,8 @@ export class Player {
       if (jetting) {
         this.smokeEmitter.setVisible(true);
         this.smokeEmitter.setPosition(
-          this.sprite.x + (this.facingRight ? -15 : 15),
-          this.sprite.y + 30
+          this.sprite.x + (this.facingRight ? -20 : 20),
+          this.sprite.y + 45
         );
         if (!this.smokeEmitter.anims.isPlaying) {
           this.smokeEmitter.play('jetpack-smoke');
@@ -273,8 +280,8 @@ export class Player {
     if (jetting) {
       this.smokeEmitter.setVisible(true);
       this.smokeEmitter.setPosition(
-        this.sprite.x + (this.facingRight ? -15 : 15),
-        this.sprite.y + 30
+        this.sprite.x + (this.facingRight ? -20 : 20),
+        this.sprite.y + 45
       );
       if (!this.smokeEmitter.anims.isPlaying) {
         this.smokeEmitter.play('jetpack-smoke');
