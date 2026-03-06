@@ -2,14 +2,18 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '@/config/game.config';
 import { CREDITS_BASE, CREDITS_WIN_BONUS } from '@/config/match.config';
 import { MatchState } from '@/types';
+import { sfx } from '@/audio/SoundGenerator';
 
 export class ResultScene extends Phaser.Scene {
+  private aiMode: boolean = false;
+
   constructor() {
     super({ key: 'Result' });
   }
 
-  create(data: { matchState: MatchState }): void {
+  create(data: { matchState: MatchState; aiMode?: boolean }): void {
     const { matchState } = data;
+    this.aiMode = data.aiMode ?? false;
     const winner = matchState.winner;
 
     // Dark overlay
@@ -17,7 +21,8 @@ export class ResultScene extends Phaser.Scene {
 
     // Winner text
     const winnerColor = winner === 1 ? '#f5c542' : '#ff6644';
-    const winnerName = winner === 1 ? 'PLAYER 1' : 'PLAYER 2';
+    const p2Label = this.aiMode ? 'AI' : 'PLAYER 2';
+    const winnerName = winner === 1 ? 'PLAYER 1' : p2Label;
 
     this.add.text(GAME_WIDTH / 2, 100, `${winnerName} WINS!`, {
       fontSize: '56px',
@@ -45,7 +50,7 @@ export class ResultScene extends Phaser.Scene {
     this.add.text(GAME_WIDTH / 2 - 180, scoreY, 'P1', {
       fontSize: '24px', fontFamily: 'monospace', color: '#f5c542', fontStyle: 'bold',
     }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2 + 180, scoreY, 'P2', {
+    this.add.text(GAME_WIDTH / 2 + 180, scoreY, this.aiMode ? 'AI' : 'P2', {
       fontSize: '24px', fontFamily: 'monospace', color: '#ff6644', fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -95,8 +100,9 @@ export class ResultScene extends Phaser.Scene {
     rematchBtn.on('pointerover', () => rematchBtn.setScale(1.3));
     rematchBtn.on('pointerout', () => rematchBtn.setScale(1.2));
     rematchBtn.on('pointerdown', () => {
+      sfx.menuClick();
       this.cameras.main.fadeOut(300);
-      this.time.delayedCall(300, () => this.scene.start('Arena'));
+      this.time.delayedCall(300, () => this.scene.start('Arena', { aiMode: this.aiMode }));
     });
 
     const menuBtn = this.add.image(GAME_WIDTH / 2 + 100, 585, 'btn-menu')
@@ -109,6 +115,7 @@ export class ResultScene extends Phaser.Scene {
     menuBtn.on('pointerover', () => menuBtn.setScale(1.3));
     menuBtn.on('pointerout', () => menuBtn.setScale(1.2));
     menuBtn.on('pointerdown', () => {
+      sfx.menuClick();
       this.cameras.main.fadeOut(300);
       this.time.delayedCall(300, () => this.scene.start('MainMenu'));
     });

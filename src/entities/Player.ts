@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { PlayerConfig, ControlScheme } from '@/types';
 import { PLAYER_PHYSICS } from '@/config/player.config';
 import { PRIMARY_WEAPON, SECONDARY_WEAPON } from '@/config/weapons.config';
+import { sfx } from '@/audio/SoundGenerator';
 
 export class Player {
   scene: Phaser.Scene;
@@ -121,6 +122,7 @@ export class Player {
       const now = this.scene.time.now;
       if (now - this.lastDash >= Player.DASH_COOLDOWN) {
         this.lastDash = now;
+        sfx.dash();
         const dashVx = this.facingRight ? Player.DASH_SPEED : -Player.DASH_SPEED;
         this.body.setVelocityX(dashVx);
         this.isInvincible = true;
@@ -263,6 +265,24 @@ export class Player {
   heal(amount: number): void {
     if (this.isDead) return;
     this.hp = Math.min(this.hp + amount, PLAYER_PHYSICS.maxHP);
+  }
+
+  /** Update jetpack smoke visual — called by AIController when bypassing update() */
+  updateSmoke(jetting: boolean): void {
+    if (!this.smokeEmitter) return;
+    if (jetting) {
+      this.smokeEmitter.setVisible(true);
+      this.smokeEmitter.setPosition(
+        this.sprite.x + (this.facingRight ? -15 : 15),
+        this.sprite.y + 30
+      );
+      if (!this.smokeEmitter.anims.isPlaying) {
+        this.smokeEmitter.play('jetpack-smoke');
+      }
+    } else {
+      this.smokeEmitter.setVisible(false);
+      this.smokeEmitter.stop();
+    }
   }
 
   destroy(): void {

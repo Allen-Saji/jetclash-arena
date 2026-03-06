@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Player } from '@/entities/Player';
+import { AIController } from '@/entities/AIController';
 import { ProjectilePool, Projectile } from '@/entities/Projectile';
 import { Pickup } from '@/entities/Pickup';
 import { HUD } from '@/components/HUD';
@@ -9,10 +10,13 @@ import { MATCH_DURATION, KILL_SCORE, KILL_CAP } from '@/config/match.config';
 import { GAME_WIDTH, GAME_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT } from '@/config/game.config';
 import { ARENA_PLATFORMS, PICKUP_SPAWNS, SPAWN_POINTS, TREE_DECORATIONS } from '@/config/arena.config';
 import { MatchState } from '@/types';
+import { sfx } from '@/audio/SoundGenerator';
 
 export class ArenaScene extends Phaser.Scene {
   private player1!: Player;
   private player2!: Player;
+  private aiController: AIController | null = null;
+  private aiMode: boolean = false;
   private projectiles!: ProjectilePool;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private pickups: Pickup[] = [];
@@ -33,7 +37,9 @@ export class ArenaScene extends Phaser.Scene {
     super({ key: 'Arena' });
   }
 
-  create(): void {
+  create(data: { aiMode?: boolean }): void {
+    this.aiMode = data?.aiMode ?? false;
+
     // Reset match state
     this.matchState = {
       timeRemaining: MATCH_DURATION,
@@ -44,6 +50,10 @@ export class ArenaScene extends Phaser.Scene {
     };
     this.countdownActive = true;
     this.pickups = [];
+    this.aiController = null;
+
+    // Init audio
+    sfx.init();
 
     // World bounds
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -61,6 +71,11 @@ export class ArenaScene extends Phaser.Scene {
     this.player1 = new Player(this, P1_CONFIG);
     this.player2 = new Player(this, P2_CONFIG);
 
+    // AI controller for P2
+    if (this.aiMode) {
+      this.aiController = new AIController(this, this.player2, this.player1);
+    }
+
     // Projectile pool
     this.projectiles = new ProjectilePool(this, 40);
 
@@ -70,19 +85,23 @@ export class ArenaScene extends Phaser.Scene {
     // Collisions
     this.setupCollisions();
 
-    // Camera - split screen style: follow midpoint between players
+    // Camera
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.setZoom(1);
 
     // HUD (after camera so it's on top)
     this.hud = new HUD(this);
 
+    // Mute key
+    this.input.keyboard!.on('keydown-M', () => {
+      sfx.toggleMute();
+    });
+
     // Countdown
     this.startCountdown();
   }
 
   private createBackground(): void {
-    // Tile the repeated background layer
     const bg = this.add.tileSprite(
       WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
       WORLD_WIDTH, WORLD_HEIGHT,
@@ -91,13 +110,11 @@ export class ArenaScene extends Phaser.Scene {
     bg.setScrollFactor(0.2);
     bg.setDepth(-10);
 
-    // Layer 1 - parallax mid
     const layer1 = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT - 200, 'bg1-layer1');
     layer1.setDisplaySize(WORLD_WIDTH, 600);
     layer1.setScrollFactor(0.4);
     layer1.setDepth(-9);
 
-    // Layer 2 - parallax near
     const layer2 = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT - 100, 'bg1-layer2');
     layer2.setDisplaySize(WORLD_WIDTH, 400);
     layer2.setScrollFactor(0.6);
@@ -140,7 +157,7 @@ export class ArenaScene extends Phaser.Scene {
     this.physics.add.collider(this.player1.sprite, this.platforms);
     this.physics.add.collider(this.player2.sprite, this.platforms);
 
-    // Players vs each other (prevent overlap)
+    // Players vs each other
     this.physics.add.collider(this.player1.sprite, this.player2.sprite);
 
     // Projectiles vs platforms
@@ -179,7 +196,6 @@ export class ArenaScene extends Phaser.Scene {
       this.projectiles.group,
       this.player2.sprite,
       (obj1, obj2) => {
-        // Try both args — Phaser may pass them in either order
         let proj: Projectile;
         if (typeof (obj1 as any).deactivate === 'function') {
           proj = obj1 as Projectile;
@@ -196,9 +212,11 @@ export class ArenaScene extends Phaser.Scene {
     // Players vs pickups
     for (const pickup of this.pickups) {
       this.physics.add.overlap(this.player1.sprite, pickup.sprite, () => {
+        if (!pickup.isConsumed) sfx.pickup();
         pickup.consume(this.player1);
       });
       this.physics.add.overlap(this.player2.sprite, pickup.sprite, () => {
+        if (!pickup.isConsumed) sfx.pickup();
         pickup.consume(this.player2);
       });
     }
@@ -208,6 +226,7 @@ export class ArenaScene extends Phaser.Scene {
     if (player.isDead || player.isInvincible || !proj.active) return;
 
     player.takeDamage(proj.damage);
+    sfx.hit();
 
     // Screen shake on hit
     const intensity = proj.isRocket ? 0.01 : 0.005;
@@ -227,6 +246,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private onPlayerKill(killerId: 1 | 2, victim: Player): void {
+    sfx.kill();
+
     if (killerId === 1) {
       this.matchState.kills.p1++;
       this.matchState.scores.p1 += KILL_SCORE;
@@ -250,6 +271,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnExplosion(x: number, y: number): void {
+    sfx.explosion();
     const explosion = this.add.sprite(x, y, 'collision1-1');
     explosion.setScale(1.5);
     explosion.play('explosion');
@@ -269,6 +291,22 @@ export class ArenaScene extends Phaser.Scene {
       strokeThickness: 6,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
+    // Show AI mode indicator
+    if (this.aiMode) {
+      const aiLabel = this.add.text(cx, cy + 80, 'VS AI', {
+        fontSize: '24px',
+        fontFamily: 'monospace',
+        color: '#ff6644',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+      this.time.delayedCall(4000, () => aiLabel.destroy());
+    }
+
+    sfx.countdownBeep();
+
     let count = 3;
     const countInterval = this.time.addEvent({
       delay: 1000,
@@ -276,6 +314,7 @@ export class ArenaScene extends Phaser.Scene {
         count--;
         if (count > 0) {
           countText.setText(`${count}`);
+          sfx.countdownBeep();
           this.tweens.add({
             targets: countText,
             scale: { from: 1.5, to: 1 },
@@ -285,6 +324,7 @@ export class ArenaScene extends Phaser.Scene {
         } else if (count === 0) {
           countText.setText('FIGHT!');
           countText.setFontSize(60);
+          sfx.fightBeep();
           this.tweens.add({
             targets: countText,
             scale: { from: 1.5, to: 1 },
@@ -322,6 +362,7 @@ export class ArenaScene extends Phaser.Scene {
   private endMatch(): void {
     this.matchState.isActive = false;
     if (this.matchTimer) this.matchTimer.destroy();
+    sfx.matchEnd();
 
     // Determine winner
     if (this.matchState.scores.p1 > this.matchState.scores.p2) {
@@ -329,13 +370,11 @@ export class ArenaScene extends Phaser.Scene {
     } else if (this.matchState.scores.p2 > this.matchState.scores.p1) {
       this.matchState.winner = 2;
     } else {
-      // Tie goes to whoever has more kills; if still tied, P1 wins
       this.matchState.winner = this.matchState.kills.p1 >= this.matchState.kills.p2 ? 1 : 2;
     }
 
-    // Brief delay then result screen
     this.time.delayedCall(1500, () => {
-      this.scene.start('Result', { matchState: this.matchState });
+      this.scene.start('Result', { matchState: this.matchState, aiMode: this.aiMode });
     });
   }
 
@@ -356,23 +395,36 @@ export class ArenaScene extends Phaser.Scene {
       this.player1.secondaryAmmo--;
     }
 
-    // P2 primary
-    if (this.player2.keys.shoot.isDown && this.player2.canFirePrimary(now)) {
-      this.fireWeapon(this.player2, PRIMARY_WEAPON);
-      this.player2.lastPrimaryFire = now;
-      this.player2.primaryAmmo--;
-    }
-    // P2 secondary
-    if (Phaser.Input.Keyboard.JustDown(this.player2.keys.secondary) && this.player2.canFireSecondary(now)) {
-      this.fireWeapon(this.player2, SECONDARY_WEAPON);
-      this.player2.lastSecondaryFire = now;
-      this.player2.secondaryAmmo--;
+    if (this.aiMode && this.aiController) {
+      // AI shooting
+      if (this.aiController.shouldShootPrimary() && this.player2.canFirePrimary(now)) {
+        this.fireWeapon(this.player2, PRIMARY_WEAPON);
+        this.player2.lastPrimaryFire = now;
+        this.player2.primaryAmmo--;
+      }
+      if (this.aiController.shouldShootSecondary() && this.player2.canFireSecondary(now)) {
+        this.fireWeapon(this.player2, SECONDARY_WEAPON);
+        this.player2.lastSecondaryFire = now;
+        this.player2.secondaryAmmo--;
+      }
+    } else {
+      // P2 primary (keyboard)
+      if (this.player2.keys.shoot.isDown && this.player2.canFirePrimary(now)) {
+        this.fireWeapon(this.player2, PRIMARY_WEAPON);
+        this.player2.lastPrimaryFire = now;
+        this.player2.primaryAmmo--;
+      }
+      // P2 secondary
+      if (Phaser.Input.Keyboard.JustDown(this.player2.keys.secondary) && this.player2.canFireSecondary(now)) {
+        this.fireWeapon(this.player2, SECONDARY_WEAPON);
+        this.player2.lastSecondaryFire = now;
+        this.player2.secondaryAmmo--;
+      }
     }
   }
 
   private fireWeapon(player: Player, weapon: typeof PRIMARY_WEAPON): void {
     const offsetX = player.facingRight ? 50 : -50;
-    // Use different bullet texture per player
     const actualWeapon = { ...weapon };
     if (weapon.projectileKey === 'bullet' && player.config.id === 2) {
       actualWeapon.projectileKey = 'bullet-p2';
@@ -384,13 +436,28 @@ export class ArenaScene extends Phaser.Scene {
       actualWeapon,
       player.config.id
     );
+
+    // Sound
+    if (weapon === SECONDARY_WEAPON) {
+      sfx.rocket();
+    } else {
+      sfx.shoot();
+    }
   }
 
   update(_time: number, delta: number): void {
     if (this.countdownActive) return;
 
+    // Update P1 always via keyboard
     this.player1.update(delta);
-    this.player2.update(delta);
+
+    // P2: AI or keyboard
+    if (this.aiMode && this.aiController) {
+      this.aiController.update(delta);
+    } else {
+      this.player2.update(delta);
+    }
+
     this.handleShooting();
     this.hud.update(this.player1, this.player2, this.matchState);
 
