@@ -1,0 +1,51 @@
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+arena-config = "7UHeP4BPqSjfsgcezw3M64TSQYi4BaaWhwH1PkEX96eB"
+create-match = "4vrZHTpdz97cCtyhbQuAd2XmvipjuyBQGzqfF4SEgrKX"
+init-arena = "Ep4V1sF7RM1o2kBwQG3y86oxrYhd9F9FaCfjdfBYwSyh"
+match-state = "23fHYfpHxeCdc38an2CzTkkoGAinN45XodaxVpofuJ1y"
+pickup-state = "mXNgrxeBx2tiTCh1XxMREergiJ3XgK7YZhNvLA2e5wJ"
+player-state = "SVqcqnh6iqyyUTpzLPpV2zjY2eh96wjDkt8Cvs8feoF"
+process-input = "BnhdpxbxwTx4EABpRazimuSR9FGmQADAVdzi8HkDXAaG"
+projectile-pool = "3vwaQkFZVMvpPFuMvTtUfa1qwrbBDPrLCZhXVtcA4DC8"
+tick-combat = "BRdU8TEqfja1aCwhpTznxs7N5wtsEK9XwMrQpgAcXYj"
+tick-physics = "BHwje821iKJ3TCWwtRCQkiuBefJym41zRePDwQQ5ci6r"
+tick-pickups = "6svTwtJNorS61WgrVuBUeJGFZZCniK5zifffikmjZDqQ"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[workspace]
+members = ["programs/*", "programs-ecs/components/*", "programs-ecs/systems/*"]
+
+[scripts]
+test = "npx ts-mocha -p ./tsconfig.anchor.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 10000
+shutdown_wait = 2000
+upgradeable = false
+
+[[test.genesis]]
+address = "WorLD15A7CrDwLcLy4fRqtaTb9fbd8o8iqiEMUDse2n"
+program = "tests/fixtures/world.so"
+upgradeable = false
+
+[test.validator]
+bind_address = "127.0.0.1"
+url = "https://rpc.magicblock.app/devnet/"
+ledger = ".bolt/test-ledger"
+rpc_port = 8899
+
+[[test.validator.account]]
+address = "EHLkWwAT9oebVv9ht3mtqrvHhRVMKrt54tF3MfHTey2K"
+filename = "tests/fixtures/registry.json"
