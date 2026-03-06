@@ -6,14 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@magicblock-labs/bolt-sdk": "^0.2.4",
+    "@solana/web3.js": "^1.98.4",
+    "buffer": "^6.0.3",
     "phaser": "^3.80.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "playwright": "^1.58.2",
     "typescript": "^5.4.0",
-    "vite": "^5.4.0"
+    "vite": "^5.4.0",
+    "vite-plugin-node-polyfills": "^0.25.0"
   }
 }
