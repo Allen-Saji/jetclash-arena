@@ -10,3 +10,9 @@ test-results/
 target/
 .anchor/
 .bolt/
+
+# MagicBlock test storage
+magicblock-test-storage/
+
+# Client Rust crates (build artifact)
+client/crates/
