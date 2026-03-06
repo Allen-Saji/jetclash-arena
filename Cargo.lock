@@ -783,6 +783,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "delegate-match"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "match-state",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1718,6 +1726,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "settle-match"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "match-state",
+ "player-state",
 ]
 
 [[package]]

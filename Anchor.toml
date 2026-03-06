@@ -16,6 +16,8 @@ projectile-pool = "3vwaQkFZVMvpPFuMvTtUfa1qwrbBDPrLCZhXVtcA4DC8"
 tick-combat = "BRdU8TEqfja1aCwhpTznxs7N5wtsEK9XwMrQpgAcXYj"
 tick-physics = "BHwje821iKJ3TCWwtRCQkiuBefJym41zRePDwQQ5ci6r"
 tick-pickups = "6svTwtJNorS61WgrVuBUeJGFZZCniK5zifffikmjZDqQ"
+delegate-match = "Do5E78fp5F741nkNuxvk76nPndqM7pVqtCtiif7BKANA"
+settle-match = "6EFGnRNoSJyjPgaoUR4LpT8Lq9C6eQ716m1iwFJtvRgn"
 
 [registry]
 url = "https://api.apr.dev"
@@ -25,7 +27,7 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [workspace]
-members = ["programs/*", "programs-ecs/components/*", "programs-ecs/systems/*"]
+members = ["programs-ecs/components/*", "programs-ecs/systems/*"]
 
 [scripts]
 test = "npx ts-mocha -p ./tsconfig.anchor.json -t 1000000 tests/**/*.ts"
