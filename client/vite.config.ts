@@ -13,6 +13,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
     },
+    dedupe: ['@coral-xyz/anchor', '@solana/web3.js'],
   },
   server: {
     port: 3000,

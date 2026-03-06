@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import * as anchor from '@coral-xyz/anchor';
 import {
   InitializeNewWorld,
   AddEntity,
@@ -29,7 +30,7 @@ import type { MatchState } from '@/types';
 
 // ---- Deserialization helpers ----
 
-const HEADER = 40; // 8-byte discriminator + 32-byte BoltMetadata.authority
+const HEADER = 8; // 8-byte Anchor discriminator only (bolt_metadata is at END of struct)
 
 function readI32(buf: Uint8Array, offset: number): number {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
@@ -307,6 +308,18 @@ export class OnlineArenaScene extends Phaser.Scene {
     await this.wallet.requestAirdrop();
 
     const conn = this.wallet.connection;
+
+    // Set global Anchor provider so bolt-sdk can resolve it in the browser
+    const anchorWallet = {
+      publicKey: this.wallet.publicKey,
+      signTransaction: async (tx: any) => { tx.sign(this.wallet.keypair); return tx; },
+      signAllTransactions: async (txs: any[]) => { txs.forEach(tx => tx.sign(this.wallet.keypair)); return txs; },
+    };
+    const anchorProvider = new anchor.AnchorProvider(conn, anchorWallet as any, {
+      commitment: 'confirmed',
+      skipPreflight: true,
+    });
+    anchor.setProvider(anchorProvider);
 
     // Initialize world
     const initWorld = await InitializeNewWorld({
