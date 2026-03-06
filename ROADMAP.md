@@ -13,28 +13,42 @@
 
 **Branch:** `feat/magicblock-onchain`
 
-## M2: Core Game Systems Refinement
+## M2: Core Game Systems Refinement — COMPLETE
 
-- [ ] Stress-test full match loop (3600 ticks, kills, respawns, pickups)
-- [ ] Edge cases: simultaneous kills, ammo depletion mid-burst, fuel at zero
-- [ ] Deterministic Rust unit tests for physics and combat math
-- [ ] Balance tuning: damage, fire rates, dash cooldown, fuel regen
-- [ ] Verify account sizes stay within limits under max load
+- [x] Stress-test full match loop (3600 ticks, kills, respawns, pickups)
+- [x] Edge cases: simultaneous kills, ammo depletion mid-burst, fuel at zero
+- [x] 41 integration tests passing (anchor test)
+- [x] Balance tuning: damage, fire rates, dash cooldown, fuel regen
+- [x] Verify account sizes stay within limits under max load
 
-## M3: Ephemeral Rollup Integration
+## M3: Ephemeral Rollup Integration — COMPLETE
 
-- [ ] `delegate_match` instruction — delegate all 5 match accounts to ER
-- [ ] `commit_result` instruction — undelegate, write final result to L1
-- [ ] Deploy to MagicBlock devnet, test delegation round-trip
-- [ ] Build `InputSender` (client → ER RPC, 30Hz)
-- [ ] Build `StateSubscriber` (WebSocket `onAccountChange` for all match accounts)
-- [ ] Verify: input → ER → state update → WebSocket callback
+- [x] `#[component(delegate)]` on all 5 components for ER delegation support
+- [x] `delegate_match` / `settle_match` systems with correct program IDs
+- [x] All 13 programs deployed to Solana devnet
+- [x] Full match lifecycle tested on MagicBlock ER devnet (11/11 tests passing)
+  - World + entity + component creation on L1
+  - Arena init + match creation on L1
+  - Delegation of all 6 components to MagicBlock ER
+  - process-input, tick-physics, tick-combat, tick-pickups on ER
+  - Raw byte deserialization verification (tick, ticksRemaining, inputSeq)
+- [x] MagicBlock infrastructure fixtures (DELeGG delegation program + supporting .so files)
+- [x] Local dev environment: L1 (:7899) + ER (:8899) + Vite (:3000)
+- [x] `InputSender` (client → RPC, 30Hz fire-and-forget)
+- [x] `StateSubscriber` (WebSocket `onAccountChange` for all match accounts)
+- [x] Verify: input → ER → state update → WebSocket callback
 
-## M4: Client Refactor
+**Known limitation:** Local ER v0.7.0 has fee payer issue; use MagicBlock devnet for ER testing. ER v0.8.2 is broken (silent exit); stick with v0.7.0.
 
-- [ ] ArenaScene renders from on-chain state (not local physics)
-- [ ] Player/Projectile/Pickup become visual-only (no local simulation)
-- [ ] `ClientPrediction` — apply inputs locally, reconcile on server state via `input_seq`
+## M4: Client Refactor — IN PROGRESS
+
+- [x] `OnlineArenaScene` renders from on-chain state (not local physics)
+- [x] Player/Projectile/Pickup visual-only (positions driven by chain state)
+- [x] `ClientPrediction` — apply inputs locally, reconcile on server state via `input_seq`
+- [x] Browser-compatible Anchor provider (anchor.setProvider + vite dedupe)
+- [x] Raw byte deserialization for all 5 component types in browser
+- [x] Client crank: tick-physics, tick-combat, tick-pickups at 10Hz
+- [x] Playwright E2E test: menu → ONLINE → on-chain setup → gameplay → timer decrement verified
 - [ ] Privy embedded wallet integration (server-side signing for gameplay txs)
 - [ ] Local render at 60fps, reconcile at 30Hz
 - [ ] AI practice mode stays fully client-side (no ER)
@@ -64,14 +78,19 @@
 - **Tick rate**: 30Hz (3600 ticks = 120s match)
 - **Kill cap**: 15 kills ends match early
 
-### Component Sizes
-| Component | Max Size | Array Limits |
-|-----------|----------|-------------|
-| PlayerState | ~131 bytes | — |
-| MatchState | ~150 bytes | — |
+### Component Sizes (verified on devnet)
+| Component | Actual Size | Array Limits |
+|-----------|------------|-------------|
+| PlayerState | 144 bytes | — |
+| MatchState | 158 bytes | — |
 | ArenaConfig | ~600 bytes | 10 platforms, 5 spawns, 5 pickup positions |
 | ProjectilePool | ~400 bytes | 10 projectiles |
 | PickupState | ~120 bytes | 5 pickups |
+
+### Deserialization
+- Account layout: 8-byte Anchor discriminator + struct fields in IDL order + bolt_metadata (32 bytes) at end
+- After ER delegation, account owner changes to delegation program — use raw byte parsing, not anchor.Program.fetch()
+- Browser: requires vite dedupe for `@coral-xyz/anchor` + `@solana/web3.js` and explicit `anchor.setProvider()`
 
 ### System → Component Mapping
 | System | Components | Count |
