@@ -33,12 +33,12 @@ export class ResultScene extends Phaser.Scene {
       strokeThickness: 4,
     }).setOrigin(0.5);
 
-    // Winner character
+    // Winner character (150x150 native, scale 1x = 150px)
     const winnerKey = winner === 1 ? 'p1-idle-1' : 'p2-idle-1';
-    const winnerSprite = this.add.image(GAME_WIDTH / 2, 230, winnerKey).setScale(3);
+    const winnerSprite = this.add.image(GAME_WIDTH / 2, 205, winnerKey);
     this.tweens.add({
       targets: winnerSprite,
-      y: '+=8',
+      y: '+=6',
       duration: 1000,
       yoyo: true,
       repeat: -1,
@@ -46,7 +46,7 @@ export class ResultScene extends Phaser.Scene {
     });
 
     // Scores
-    const scoreY = 340;
+    const scoreY = 300;
     this.add.text(GAME_WIDTH / 2 - 180, scoreY, 'P1', {
       fontSize: '24px', fontFamily: 'monospace', color: '#f5c542', fontStyle: 'bold',
     }).setOrigin(0.5);
