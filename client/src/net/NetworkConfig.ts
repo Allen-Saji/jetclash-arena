@@ -11,23 +11,23 @@ const PROGRAM_IDS = {
   tickPhysics: new PublicKey('BHwje821iKJ3TCWwtRCQkiuBefJym41zRePDwQQ5ci6r'),
   tickCombat: new PublicKey('BRdU8TEqfja1aCwhpTznxs7N5wtsEK9XwMrQpgAcXYj'),
   tickPickups: new PublicKey('6svTwtJNorS61WgrVuBUeJGFZZCniK5zifffikmjZDqQ'),
-  delegateMatch: new PublicKey('Do5E78fp5F741nkNuxvk76nPndqM7pVqtCtiif7BKANA'),
-  settleMatch: new PublicKey('6EFGnRNoSJyjPgaoUR4LpT8Lq9C6eQ716m1iwFJtvRgn'),
+  delegateMatch: new PublicKey('EM73uGdmeq4tev2BwpwZpsbrqkYf4Uf6E2pzSXKPwQ1C'),
+  settleMatch: new PublicKey('juvewJJY9UutyiH5jGJ2BS3n2RcWNhcKfMHwVvr6quz'),
   initArena: new PublicKey('Ep4V1sF7RM1o2kBwQG3y86oxrYhd9F9FaCfjdfBYwSyh'),
   createMatch: new PublicKey('4vrZHTpdz97cCtyhbQuAd2XmvipjuyBQGzqfF4SEgrKX'),
 };
 
-/** Local L1 validator (solana-test-validator on :8899) */
+/** Local L1 validator (solana-test-validator on :7899) */
 export const LOCAL_CONFIG: NetworkConfig = {
-  rpcUrl: 'http://127.0.0.1:8899',
-  wsUrl: 'ws://127.0.0.1:8900',
+  rpcUrl: 'http://127.0.0.1:7899',
+  wsUrl: 'ws://127.0.0.1:7900',
   programIds: PROGRAM_IDS,
 };
 
-/** Local Ephemeral Rollup validator (:9900) — gameplay runs here */
+/** Local Ephemeral Rollup validator (:8899) — gameplay runs here */
 export const LOCAL_ER_CONFIG: NetworkConfig = {
-  rpcUrl: 'http://127.0.0.1:9900',
-  wsUrl: 'ws://127.0.0.1:9901',
+  rpcUrl: 'http://127.0.0.1:8899',
+  wsUrl: 'ws://127.0.0.1:8900',
   programIds: PROGRAM_IDS,
 };
 

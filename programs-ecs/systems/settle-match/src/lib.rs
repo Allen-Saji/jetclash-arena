@@ -2,7 +2,7 @@ use bolt_lang::*;
 use match_state::MatchState;
 use player_state::PlayerState;
 
-declare_id!("6EFGnRNoSJyjPgaoUR4LpT8Lq9C6eQ716m1iwFJtvRgn");
+declare_id!("juvewJJY9UutyiH5jGJ2BS3n2RcWNhcKfMHwVvr6quz");
 
 #[system]
 pub mod settle_match {
