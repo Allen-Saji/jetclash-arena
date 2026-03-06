@@ -54,8 +54,14 @@ export class MainMenuScene extends Phaser.Scene {
       this.time.delayedCall(300, () => this.scene.start('Arena', { aiMode: false }));
     });
 
+    this.createModeButton(GAME_WIDTH / 2, 480, 'ONLINE', '#44bb66', () => {
+      sfx.menuClick();
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.time.delayedCall(300, () => this.scene.start('OnlineArena'));
+    });
+
     // Controls info
-    const controlsY = 560;
+    const controlsY = 590;
     this.add.text(GAME_WIDTH / 2 - 280, controlsY, [
       'PLAYER 1',
       'Move: WASD',

@@ -4,10 +4,11 @@ import { BootScene } from '@/scenes/BootScene';
 import { MainMenuScene } from '@/scenes/MainMenuScene';
 import { ArenaScene } from '@/scenes/ArenaScene';
 import { ResultScene } from '@/scenes/ResultScene';
+import { OnlineArenaScene } from '@/scenes/OnlineArenaScene';
 
 const game = new Phaser.Game({
   ...GAME_CONFIG,
-  scene: [BootScene, MainMenuScene, ArenaScene, ResultScene],
+  scene: [BootScene, MainMenuScene, ArenaScene, OnlineArenaScene, ResultScene],
 });
 
 // Hot module replacement for dev
