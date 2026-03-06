@@ -1,3 +1,0 @@
-remotes = ["http://127.0.0.1:8899"]
-lifecycle = "programs-replica"
-storage = ".bolt/ephemeral-ledger"
