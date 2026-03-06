@@ -42,16 +42,16 @@ export class MainMenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // --- Mode buttons ---
-    this.createModeButton(GAME_WIDTH / 2, 340, 'VS PLAYER', '#f5c542', () => {
-      sfx.menuClick();
-      this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.time.delayedCall(300, () => this.scene.start('Arena', { aiMode: false }));
-    });
-
-    this.createModeButton(GAME_WIDTH / 2, 410, 'VS AI', '#ff6644', () => {
+    this.createModeButton(GAME_WIDTH / 2, 340, 'SINGLEPLAYER', '#ff6644', () => {
       sfx.menuClick();
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.time.delayedCall(300, () => this.scene.start('Arena', { aiMode: true }));
+    });
+
+    this.createModeButton(GAME_WIDTH / 2, 410, 'MULTIPLAYER', '#f5c542', () => {
+      sfx.menuClick();
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.time.delayedCall(300, () => this.scene.start('Arena', { aiMode: false }));
     });
 
     // Controls info
@@ -103,10 +103,10 @@ export class MainMenuScene extends Phaser.Scene {
 
     // Floating characters preview
     const p1Preview = this.add.image(GAME_WIDTH / 2 - 280, 380, 'p1-idle-1')
-      .setScale(2.5)
+      .setScale(2)
       .setFlipX(false);
     const p2Preview = this.add.image(GAME_WIDTH / 2 + 280, 380, 'p2-idle-1')
-      .setScale(2.5)
+      .setScale(2)
       .setFlipX(true);
 
     this.tweens.add({
