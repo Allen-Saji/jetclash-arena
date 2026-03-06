@@ -2,7 +2,7 @@ use bolt_lang::*;
 
 declare_id!("SVqcqnh6iqyyUTpzLPpV2zjY2eh96wjDkt8Cvs8feoF");
 
-#[component]
+#[component(delegate)]
 pub struct PlayerState {
     /// The player's wallet pubkey
     pub player_authority: Pubkey,

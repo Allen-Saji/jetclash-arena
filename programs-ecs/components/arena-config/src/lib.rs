@@ -33,7 +33,7 @@ pub const MAX_PLATFORMS: usize = 10;
 pub const MAX_SPAWN_POINTS: usize = 5;
 pub const MAX_PICKUP_POSITIONS: usize = 5;
 
-#[component]
+#[component(delegate)]
 pub struct ArenaConfig {
     pub platforms: [AABB; MAX_PLATFORMS],
     pub platform_count: u8,

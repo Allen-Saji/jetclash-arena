@@ -2,7 +2,7 @@ use bolt_lang::*;
 
 declare_id!("23fHYfpHxeCdc38an2CzTkkoGAinN45XodaxVpofuJ1y");
 
-#[component]
+#[component(delegate)]
 pub struct MatchState {
     pub match_id: Pubkey,
     pub player1: Pubkey,

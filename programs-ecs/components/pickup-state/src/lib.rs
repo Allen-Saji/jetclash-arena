@@ -26,7 +26,7 @@ impl Default for PickupData {
 
 pub const MAX_PICKUPS: usize = 5;
 
-#[component]
+#[component(delegate)]
 pub struct PickupState {
     pub pickups: [PickupData; MAX_PICKUPS],
 }

@@ -35,7 +35,7 @@ impl Default for ProjectileData {
 
 pub const MAX_PROJECTILES: usize = 10;
 
-#[component]
+#[component(delegate)]
 pub struct ProjectilePool {
     pub projectiles: [ProjectileData; MAX_PROJECTILES],
 }
