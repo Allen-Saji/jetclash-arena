@@ -5,3 +5,8 @@ assets-raw/
 test-results/
 /tmp/
 .DS_Store
+
+# Anchor / BOLT build artifacts
+target/
+.anchor/
+.bolt/

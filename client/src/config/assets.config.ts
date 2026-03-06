@@ -62,7 +62,7 @@ export const BACKGROUND_ASSETS = [
 export const PROJECTILE_ASSETS = [
   { key: 'bullet', path: 'assets/projectiles/3.png' },
   { key: 'bullet-p2', path: 'assets/projectiles/7.png' },
-  { key: 'rocket', path: 'assets/projectiles/5.png' },
+  { key: 'rocket', path: 'assets/projectiles/8.png' },
 ];
 
 export const ITEM_ASSETS = {
