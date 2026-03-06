@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Player } from '@/entities/Player';
 import { PLAYER_PHYSICS } from '@/config/player.config';
 import { MATCH_DURATION, KILL_CAP } from '@/config/match.config';
+import { GAME_WIDTH, GAME_HEIGHT } from '@/config/game.config';
 import { MatchState } from '@/types';
 
 export class HUD {
@@ -136,6 +137,16 @@ export class HUD {
     if (matchState.timeRemaining <= 10) {
       this.timerText.setColor(Math.sin(this.scene.time.now * 0.005) > 0 ? '#ff4444' : '#ffffff');
     }
+  }
+
+  setZoomCompensation(zoom: number): void {
+    const invZoom = 1 / zoom;
+    this.container.setScale(invZoom);
+    // Adjust position so scaling is centered on the viewport
+    this.container.setPosition(
+      (1 - invZoom) * GAME_WIDTH / 2,
+      (1 - invZoom) * GAME_HEIGHT / 2
+    );
   }
 
   destroy(): void {

@@ -85,9 +85,11 @@ export class ArenaScene extends Phaser.Scene {
     // Collisions
     this.setupCollisions();
 
-    // Camera
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    this.cameras.main.setZoom(1);
+    // Camera — fixed zoom showing full arena, smooth follow midpoint
+    const cam = this.cameras.main;
+    cam.setZoom(0.55);
+    cam.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    cam.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
 
     // HUD (after camera so it's on top)
     this.hud = new HUD(this);
@@ -101,24 +103,30 @@ export class ArenaScene extends Phaser.Scene {
     this.startCountdown();
   }
 
+  private bgTile!: Phaser.GameObjects.TileSprite;
+  private bgLayer1!: Phaser.GameObjects.Image;
+  private bgLayer2!: Phaser.GameObjects.Image;
+
   private createBackground(): void {
-    const bg = this.add.tileSprite(
-      WORLD_WIDTH / 2, WORLD_HEIGHT / 2,
-      WORLD_WIDTH, WORLD_HEIGHT,
-      'bg1-repeated'
-    );
-    bg.setScrollFactor(0.2);
-    bg.setDepth(-10);
+    // Tile sprite covers viewport at lowest zoom (0.55) — needs ~2x world size
+    const bgW = WORLD_WIDTH * 2;
+    const bgH = WORLD_HEIGHT * 2;
+    this.bgTile = this.add.tileSprite(0, 0, bgW, bgH, 'bg1-repeated');
+    this.bgTile.setScrollFactor(0);
+    this.bgTile.setDepth(-10);
 
-    const layer1 = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT - 200, 'bg1-layer1');
-    layer1.setDisplaySize(WORLD_WIDTH, 600);
-    layer1.setScrollFactor(0.4);
-    layer1.setDepth(-9);
+    // Parallax layers anchored to world bottom
+    this.bgLayer1 = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT - 200, 'bg1-layer1');
+    this.bgLayer1.setDisplaySize(WORLD_WIDTH * 2, 800);
+    this.bgLayer1.setScrollFactor(0.3);
+    this.bgLayer1.setDepth(-9);
+    this.bgLayer1.setAlpha(0.5);
 
-    const layer2 = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT - 100, 'bg1-layer2');
-    layer2.setDisplaySize(WORLD_WIDTH, 400);
-    layer2.setScrollFactor(0.6);
-    layer2.setDepth(-8);
+    this.bgLayer2 = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT - 100, 'bg1-layer2');
+    this.bgLayer2.setDisplaySize(WORLD_WIDTH * 2, 600);
+    this.bgLayer2.setScrollFactor(0.5);
+    this.bgLayer2.setDepth(-8);
+    this.bgLayer2.setAlpha(0.6);
   }
 
   private createDecorations(): void {
@@ -388,8 +396,8 @@ export class ArenaScene extends Phaser.Scene {
       this.player1.lastPrimaryFire = now;
       this.player1.primaryAmmo--;
     }
-    // P1 secondary
-    if (Phaser.Input.Keyboard.JustDown(this.player1.keys.secondary) && this.player1.canFireSecondary(now)) {
+    // P1 secondary (G key - use isDown since fireRate handles limiting)
+    if (this.player1.keys.secondary.isDown && this.player1.canFireSecondary(now)) {
       this.fireWeapon(this.player1, SECONDARY_WEAPON);
       this.player1.lastSecondaryFire = now;
       this.player1.secondaryAmmo--;
@@ -415,7 +423,7 @@ export class ArenaScene extends Phaser.Scene {
         this.player2.primaryAmmo--;
       }
       // P2 secondary
-      if (Phaser.Input.Keyboard.JustDown(this.player2.keys.secondary) && this.player2.canFireSecondary(now)) {
+      if (this.player2.keys.secondary.isDown && this.player2.canFireSecondary(now)) {
         this.fireWeapon(this.player2, SECONDARY_WEAPON);
         this.player2.lastSecondaryFire = now;
         this.player2.secondaryAmmo--;
@@ -424,7 +432,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private fireWeapon(player: Player, weapon: typeof PRIMARY_WEAPON): void {
-    const offsetX = player.facingRight ? 50 : -50;
+    const offsetX = player.facingRight ? 35 : -35;
     const actualWeapon = { ...weapon };
     if (weapon.projectileKey === 'bullet' && player.config.id === 2) {
       actualWeapon.projectileKey = 'bullet-p2';
@@ -461,9 +469,18 @@ export class ArenaScene extends Phaser.Scene {
     this.handleShooting();
     this.hud.update(this.player1, this.player2, this.matchState);
 
-    // Camera follows midpoint between players
+    // Camera: smooth follow midpoint between players
     const midX = (this.player1.sprite.x + this.player2.sprite.x) / 2;
     const midY = (this.player1.sprite.y + this.player2.sprite.y) / 2;
-    this.cameras.main.centerOn(midX, midY);
+    const cam = this.cameras.main;
+    const lerpFactor = 0.08;
+    cam.scrollX += (midX - cam.width / 2 - cam.scrollX) * lerpFactor;
+    cam.scrollY += (midY - cam.height / 2 - cam.scrollY) * lerpFactor;
+
+    // Keep bg tile centered on camera viewport
+    this.bgTile.setPosition(cam.scrollX + cam.width / 2, cam.scrollY + cam.height / 2);
+
+    // Scale HUD inversely to zoom so it stays readable
+    this.hud.setZoomCompensation(cam.zoom);
   }
 }
