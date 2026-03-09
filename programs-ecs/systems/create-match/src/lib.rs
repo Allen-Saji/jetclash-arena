@@ -1,19 +1,16 @@
 use bolt_lang::*;
 use match_state::MatchState;
-use player_state::PlayerState;
+use player_pool::PlayerPool;
 use projectile_pool::ProjectilePool;
 use pickup_state::PickupState;
 
-declare_id!("4vrZHTpdz97cCtyhbQuAd2XmvipjuyBQGzqfF4SEgrKX");
-
-const MATCH_TICKS: u32 = 3600;
+declare_id!("57jUShxEaZPCx5jHtCA2rrXbxXhoEG2gVvAKezmaEV1g");
 
 #[derive(serde::Deserialize)]
 struct CreateMatchArgs {
-    p1_spawn_x: i32,
-    p1_spawn_y: i32,
-    p2_spawn_x: i32,
-    p2_spawn_y: i32,
+    host_authority: [u8; 32],
+    character_id: u8,
+    min_players: u8,
 }
 
 #[system]
@@ -23,27 +20,39 @@ pub mod create_match {
         let args: CreateMatchArgs = serde_json::from_slice(&args_p)
             .map_err(|_| anchor_lang::error::Error::from(anchor_lang::error::ErrorCode::InstructionDidNotDeserialize))?;
 
+        let host_pubkey = Pubkey::new_from_array(args.host_authority);
+        let min_p = if args.min_players < 2 { 2 } else { args.min_players.min(4) };
+
         let ms = &mut ctx.accounts.match_state;
+        ms.players[0] = host_pubkey;
+        ms.player_count = 1;
+        ms.min_players = min_p;
+        ms.is_lobby = true;
+        ms.is_active = false;
+        ms.ready_mask = 0;
         ms.tick = 0;
-        ms.ticks_remaining = MATCH_TICKS;
-        ms.p1_score = 0;
-        ms.p1_kills = 0;
-        ms.p2_score = 0;
-        ms.p2_kills = 0;
-        ms.is_active = true;
+        ms.ticks_remaining = 3600;
         ms.winner = 0;
 
-        let p1 = &mut ctx.accounts.player_state_p1;
-        p1.pos_x = args.p1_spawn_x;
-        p1.pos_y = args.p1_spawn_y;
-        p1.player_index = 0;
-        reset_player(p1, true);
+        // Auto-join host as player 0
+        let p = &mut ctx.accounts.player_pool.players[0];
+        p.player_index = 0;
+        p.is_joined = true;
+        p.character_id = args.character_id;
+        p.hp = 100;
+        p.fuel = 10000;
+        p.primary_ammo = 50;
+        p.secondary_ammo = 5;
+        p.facing_right = true;
+        p.is_dead = false;
+        p.kills = 0;
+        p.deaths = 0;
+        p.score = 0;
 
-        let p2 = &mut ctx.accounts.player_state_p2;
-        p2.pos_x = args.p2_spawn_x;
-        p2.pos_y = args.p2_spawn_y;
-        p2.player_index = 1;
-        reset_player(p2, false);
+        // Clear other player slots
+        for i in 1..player_pool::MAX_PLAYERS {
+            ctx.accounts.player_pool.players[i] = player_pool::PlayerData::default();
+        }
 
         for proj in ctx.accounts.projectile_pool.projectiles.iter_mut() {
             proj.active = false;
@@ -60,34 +69,8 @@ pub mod create_match {
     #[system_input]
     pub struct Components {
         pub match_state: MatchState,
-        pub player_state_p1: PlayerState,
-        pub player_state_p2: PlayerState,
+        pub player_pool: PlayerPool,
         pub projectile_pool: ProjectilePool,
         pub pickup_state: PickupState,
     }
-}
-
-fn reset_player(p: &mut PlayerState, facing_right: bool) {
-    p.vel_x = 0;
-    p.vel_y = 0;
-    p.hp = 100;
-    p.fuel = 10000;
-    p.primary_ammo = 50;
-    p.secondary_ammo = 5;
-    p.facing_right = facing_right;
-    p.is_dead = false;
-    p.is_invincible = true;
-    p.invincible_until_tick = 90;
-    p.dash_active = false;
-    p.dash_cooldown_tick = 0;
-    p.primary_cooldown_tick = 0;
-    p.secondary_cooldown_tick = 0;
-    p.primary_reload_tick = 0;
-    p.secondary_reload_tick = 0;
-    p.speed_multiplier = 100;
-    p.speed_buff_until_tick = 0;
-    p.kills = 0;
-    p.deaths = 0;
-    p.score = 0;
-    p.input_seq = 0;
 }

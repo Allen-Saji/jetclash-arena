@@ -1,9 +1,9 @@
 use bolt_lang::*;
-use player_state::PlayerState;
+use player_pool::PlayerPool;
 use projectile_pool::ProjectilePool;
 use match_state::MatchState;
 
-declare_id!("BnhdpxbxwTx4EABpRazimuSR9FGmQADAVdzi8HkDXAaG");
+declare_id!("9wPRRXi3yManMXSadD8QU2QzEzNyEbFbj5t8fCFuSUS8");
 
 const MOVE_SPEED: i32 = 25000;
 const JETPACK_FORCE: i32 = 42000;
@@ -27,6 +27,7 @@ const SECONDARY_TTL_TICKS: u16 = 120;
 
 #[derive(serde::Deserialize)]
 struct InputArgs {
+    player_index: u8,
     move_dir: i8,
     jet: bool,
     dash: bool,
@@ -42,15 +43,27 @@ pub mod process_input {
         let args: InputArgs = serde_json::from_slice(&args_p)
             .map_err(|_| anchor_lang::error::Error::from(anchor_lang::error::ErrorCode::InstructionDidNotDeserialize))?;
 
-        let player = &mut ctx.accounts.player_state;
         let match_state = &ctx.accounts.match_state;
+        let pool = &mut ctx.accounts.player_pool;
         let projectile_pool = &mut ctx.accounts.projectile_pool;
 
-        if !match_state.is_active || player.is_dead {
+        if !match_state.is_active {
             return Ok(ctx.accounts);
         }
 
+        let idx = args.player_index as usize;
+        require!(idx < player_pool::MAX_PLAYERS, ErrorProcessInput::InvalidPlayerIndex);
+        require!(pool.players[idx].is_joined, ErrorProcessInput::PlayerNotJoined);
+
         let current_tick = match_state.tick;
+
+        // We need to work with the player data via index
+        let player = &mut pool.players[idx];
+
+        if player.is_dead {
+            return Ok(ctx.accounts);
+        }
+
         player.input_seq = args.input_seq;
 
         // Movement
@@ -92,7 +105,7 @@ pub mod process_input {
             spawn_projectile(
                 projectile_pool, player.pos_x, player.pos_y - 2000,
                 if player.facing_right { PRIMARY_SPEED / 30 } else { -(PRIMARY_SPEED / 30) },
-                0, PRIMARY_DAMAGE, player.player_index, false, PRIMARY_TTL_TICKS,
+                0, PRIMARY_DAMAGE, args.player_index, false, PRIMARY_TTL_TICKS,
             );
             if player.primary_ammo == 0 {
                 player.primary_reload_tick = current_tick + PRIMARY_RELOAD_TICKS;
@@ -111,7 +124,7 @@ pub mod process_input {
             spawn_projectile(
                 projectile_pool, player.pos_x, player.pos_y - 2000,
                 if player.facing_right { SECONDARY_SPEED / 30 } else { -(SECONDARY_SPEED / 30) },
-                0, SECONDARY_DAMAGE, player.player_index, true, SECONDARY_TTL_TICKS,
+                0, SECONDARY_DAMAGE, args.player_index, true, SECONDARY_TTL_TICKS,
             );
             if player.secondary_ammo == 0 {
                 player.secondary_reload_tick = current_tick + SECONDARY_RELOAD_TICKS;
@@ -124,10 +137,18 @@ pub mod process_input {
 
     #[system_input]
     pub struct Components {
-        pub player_state: PlayerState,
+        pub player_pool: PlayerPool,
         pub match_state: MatchState,
         pub projectile_pool: ProjectilePool,
     }
+}
+
+#[error_code]
+pub enum ErrorProcessInput {
+    #[msg("Invalid player index")]
+    InvalidPlayerIndex,
+    #[msg("Player has not joined the match")]
+    PlayerNotJoined,
 }
 
 fn spawn_projectile(

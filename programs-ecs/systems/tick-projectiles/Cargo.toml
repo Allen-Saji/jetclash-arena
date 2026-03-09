@@ -1,12 +1,12 @@
 [package]
-name = "tick-combat"
+name = "tick-projectiles"
 version = "0.2.4"
 description = "Created with Bolt"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "tick_combat"
+name = "tick_projectiles"
 
 [features]
 no-entrypoint = []
@@ -21,7 +21,5 @@ custom-panic = []
 
 [dependencies]
 bolt-lang.workspace = true
-serde = { version = "1.0", features = ["derive"] }
-match-state = { version = "0.2.4", path = "../../components/match-state", features = ["cpi"] }
-player-pool = { version = "0.2.4", path = "../../components/player-pool", features = ["cpi"] }
 projectile-pool = { version = "0.2.4", path = "../../components/projectile-pool", features = ["cpi"] }
+arena-config = { version = "0.2.4", path = "../../components/arena-config", features = ["cpi"] }

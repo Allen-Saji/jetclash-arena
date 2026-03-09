@@ -1,9 +1,9 @@
 use bolt_lang::*;
 use match_state::MatchState;
-use player_state::PlayerState;
+use player_pool::PlayerPool;
 use arena_config::ArenaConfig;
 
-declare_id!("BHwje821iKJ3TCWwtRCQkiuBefJym41zRePDwQQ5ci6r");
+declare_id!("2KRfGTD6TqhLxhr65vkhoJ2oty6LEEgTrXVBF63DmbwG");
 
 const KILL_CAP: u16 = 15;
 const INVINCIBILITY_TICKS: u32 = 45;
@@ -17,8 +17,7 @@ pub mod tick_physics {
 
     pub fn execute(ctx: Context<Components>, _args_p: Vec<u8>) -> Result<Components> {
         let ms = &mut ctx.accounts.match_state;
-        let p1 = &mut ctx.accounts.player_state_p1;
-        let p2 = &mut ctx.accounts.player_state_p2;
+        let pool = &mut ctx.accounts.player_pool;
         let arena = &ctx.accounts.arena_config;
 
         if !ms.is_active {
@@ -27,7 +26,7 @@ pub mod tick_physics {
 
         // Timer
         if ms.ticks_remaining == 0 {
-            end_match(ms, p1, p2);
+            end_match(ms, pool);
             return Ok(ctx.accounts);
         }
         ms.ticks_remaining -= 1;
@@ -35,42 +34,35 @@ pub mod tick_physics {
         let tick = ms.tick;
 
         let gravity_per_tick = arena.gravity / 30;
-        apply_physics(p1, gravity_per_tick, arena);
-        apply_physics(p2, gravity_per_tick, arena);
-        resolve_platforms(p1, arena);
-        resolve_platforms(p2, arena);
 
-        // Respawn dead players
-        if p1.is_dead && tick >= p1.respawn_at_tick {
-            respawn_player(p1, arena, 0, tick);
-        }
-        if p2.is_dead && tick >= p2.respawn_at_tick {
-            respawn_player(p2, arena, 1, tick);
-        }
+        for i in 0..player_pool::MAX_PLAYERS {
+            if !pool.players[i].is_joined { continue; }
+            apply_physics(&mut pool.players[i], gravity_per_tick, arena);
+            resolve_platforms(&mut pool.players[i], arena);
 
-        // Clear expired buffs
-        if p1.is_invincible && tick >= p1.invincible_until_tick {
-            p1.is_invincible = false;
-        }
-        if p2.is_invincible && tick >= p2.invincible_until_tick {
-            p2.is_invincible = false;
-        }
-        if p1.speed_multiplier > 100 && tick >= p1.speed_buff_until_tick {
-            p1.speed_multiplier = 100;
-        }
-        if p2.speed_multiplier > 100 && tick >= p2.speed_buff_until_tick {
-            p2.speed_multiplier = 100;
-        }
-        if p1.dash_active && tick >= p1.dash_cooldown_tick.saturating_sub(54) {
-            p1.dash_active = false;
-        }
-        if p2.dash_active && tick >= p2.dash_cooldown_tick.saturating_sub(54) {
-            p2.dash_active = false;
+            // Respawn dead players
+            if pool.players[i].is_dead && tick >= pool.players[i].respawn_at_tick {
+                respawn_player(&mut pool.players[i], arena, i, tick);
+            }
+
+            // Clear expired buffs
+            if pool.players[i].is_invincible && tick >= pool.players[i].invincible_until_tick {
+                pool.players[i].is_invincible = false;
+            }
+            if pool.players[i].speed_multiplier > 100 && tick >= pool.players[i].speed_buff_until_tick {
+                pool.players[i].speed_multiplier = 100;
+            }
+            if pool.players[i].dash_active && tick >= pool.players[i].dash_cooldown_tick.saturating_sub(54) {
+                pool.players[i].dash_active = false;
+            }
         }
 
         // Kill cap check
-        if ms.p1_kills >= KILL_CAP || ms.p2_kills >= KILL_CAP {
-            end_match(ms, p1, p2);
+        for i in 0..player_pool::MAX_PLAYERS {
+            if pool.players[i].is_joined && pool.players[i].kills >= KILL_CAP {
+                end_match(ms, pool);
+                break;
+            }
         }
 
         Ok(ctx.accounts)
@@ -79,13 +71,12 @@ pub mod tick_physics {
     #[system_input]
     pub struct Components {
         pub match_state: MatchState,
-        pub player_state_p1: PlayerState,
-        pub player_state_p2: PlayerState,
+        pub player_pool: PlayerPool,
         pub arena_config: ArenaConfig,
     }
 }
 
-fn apply_physics(player: &mut PlayerState, gravity_per_tick: i32, arena: &ArenaConfig) {
+fn apply_physics(player: &mut player_pool::PlayerData, gravity_per_tick: i32, arena: &ArenaConfig) {
     if player.is_dead { return; }
     player.vel_y += gravity_per_tick;
     player.pos_x += player.vel_x;
@@ -107,7 +98,7 @@ fn apply_physics(player: &mut PlayerState, gravity_per_tick: i32, arena: &ArenaC
     }
 }
 
-fn resolve_platforms(player: &mut PlayerState, arena: &ArenaConfig) {
+fn resolve_platforms(player: &mut player_pool::PlayerData, arena: &ArenaConfig) {
     if player.is_dead { return; }
     for i in 0..(arena.platform_count as usize) {
         let plat = &arena.platforms[i];
@@ -128,8 +119,8 @@ fn resolve_platforms(player: &mut PlayerState, arena: &ArenaConfig) {
     }
 }
 
-fn respawn_player(player: &mut PlayerState, arena: &ArenaConfig, idx: u8, tick: u32) {
-    let si = if idx == 0 { 0 } else { 1usize.min(arena.spawn_point_count as usize - 1) };
+fn respawn_player(player: &mut player_pool::PlayerData, arena: &ArenaConfig, idx: usize, tick: u32) {
+    let si = idx.min(arena.spawn_point_count as usize - 1);
     player.pos_x = arena.spawn_points[si].x;
     player.pos_y = arena.spawn_points[si].y;
     player.vel_x = 0;
@@ -143,7 +134,20 @@ fn respawn_player(player: &mut PlayerState, arena: &ArenaConfig, idx: u8, tick: 
     player.secondary_ammo = 5;
 }
 
-fn end_match(ms: &mut MatchState, p1: &PlayerState, p2: &PlayerState) {
+fn end_match(ms: &mut MatchState, pool: &PlayerPool) {
     ms.is_active = false;
-    ms.winner = if p1.kills > p2.kills { 1 } else if p2.kills > p1.kills { 2 } else { 3 };
+    let mut best_idx: usize = 0;
+    let mut best_kills: u16 = 0;
+    let mut draw = false;
+    for i in 0..player_pool::MAX_PLAYERS {
+        if !pool.players[i].is_joined { continue; }
+        if pool.players[i].kills > best_kills {
+            best_kills = pool.players[i].kills;
+            best_idx = i;
+            draw = false;
+        } else if pool.players[i].kills == best_kills && pool.players[i].kills > 0 {
+            draw = true;
+        }
+    }
+    ms.winner = if draw { 5 } else { (best_idx as u8) + 1 };
 }

@@ -22,4 +22,4 @@ custom-panic = []
 [dependencies]
 bolt-lang.workspace = true
 match-state = { version = "0.2.4", path = "../../components/match-state", features = ["cpi"] }
-player-state = { version = "0.2.4", path = "../../components/player-state", features = ["cpi"] }
+player-pool = { version = "0.2.4", path = "../../components/player-pool", features = ["cpi"] }

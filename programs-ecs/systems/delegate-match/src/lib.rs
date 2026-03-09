@@ -1,7 +1,7 @@
 use bolt_lang::*;
 use match_state::MatchState;
 
-declare_id!("EM73uGdmeq4tev2BwpwZpsbrqkYf4Uf6E2pzSXKPwQ1C");
+declare_id!("tFnVHnpwChv6nRP21yoRijab1FrRaUX51sAY8fGzQ1a");
 
 #[system]
 pub mod delegate_match {

@@ -2,7 +2,7 @@ use bolt_lang::*;
 use arena_config::ArenaConfig;
 use pickup_state::PickupState;
 
-declare_id!("Ep4V1sF7RM1o2kBwQG3y86oxrYhd9F9FaCfjdfBYwSyh");
+declare_id!("5FDD7CHTMqtdZzQKykJxhFEU7r7UFCGkVnSt1jGWp63v");
 
 #[derive(serde::Deserialize)]
 struct ArenaInitArgs {
