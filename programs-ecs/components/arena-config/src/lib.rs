@@ -1,6 +1,6 @@
 use bolt_lang::*;
 
-declare_id!("7UHeP4BPqSjfsgcezw3M64TSQYi4BaaWhwH1PkEX96eB");
+declare_id!("C98REzdiMKjPdL3FLdYHspMRT1ftfFCb6dwke3siFiVo");
 
 /// Axis-Aligned Bounding Box for platform collision
 #[component_deserialize]

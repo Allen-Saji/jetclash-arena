@@ -1,6 +1,6 @@
 use bolt_lang::*;
 
-declare_id!("3vwaQkFZVMvpPFuMvTtUfa1qwrbBDPrLCZhXVtcA4DC8");
+declare_id!("HeLceFEFqD9JxWSGaLLCMtwkA6QL53xAWzUvsWGbJCqy");
 
 /// Single projectile in the pool
 #[component_deserialize]

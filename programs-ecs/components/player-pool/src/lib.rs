@@ -1,12 +1,11 @@
 use bolt_lang::*;
 
-declare_id!("SVqcqnh6iqyyUTpzLPpV2zjY2eh96wjDkt8Cvs8feoF");
+declare_id!("4n1pmeKn5BkXqPDSuaTnrC8kJqo17tM9AVQbfpTExnbz");
 
-#[component(delegate)]
-pub struct PlayerState {
-    /// The player's wallet pubkey
-    pub player_authority: Pubkey,
-    /// Fixed-point *100. E.g. x=70000 means 700.00
+pub const MAX_PLAYERS: usize = 4;
+
+#[component_deserialize]
+pub struct PlayerData {
     pub pos_x: i32,
     pub pos_y: i32,
     pub vel_x: i32,
@@ -30,20 +29,19 @@ pub struct PlayerState {
     pub primary_reload_tick: u32,
     pub secondary_reload_tick: u32,
     pub speed_buff_until_tick: u32,
-    /// Last input sequence processed (for client prediction reconciliation)
     pub input_seq: u32,
     pub kills: u16,
     pub deaths: u16,
     pub score: u32,
-    /// 0 = player1, 1 = player2
+    /// 0-3 player slot index
     pub player_index: u8,
+    pub is_joined: bool,
+    pub character_id: u8,
 }
 
-impl Default for PlayerState {
+impl Default for PlayerData {
     fn default() -> Self {
         Self {
-            bolt_metadata: BoltMetadata { authority: Pubkey::default() },
-            player_authority: Pubkey::default(),
             pos_x: 0,
             pos_y: 0,
             vel_x: 0,
@@ -70,6 +68,22 @@ impl Default for PlayerState {
             deaths: 0,
             score: 0,
             player_index: 0,
+            is_joined: false,
+            character_id: 0,
+        }
+    }
+}
+
+#[component(delegate)]
+pub struct PlayerPool {
+    pub players: [PlayerData; MAX_PLAYERS],
+}
+
+impl Default for PlayerPool {
+    fn default() -> Self {
+        Self {
+            bolt_metadata: BoltMetadata { authority: Pubkey::default() },
+            players: [PlayerData::default(); MAX_PLAYERS],
         }
     }
 }

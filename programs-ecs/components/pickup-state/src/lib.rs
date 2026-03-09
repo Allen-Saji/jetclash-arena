@@ -1,6 +1,6 @@
 use bolt_lang::*;
 
-declare_id!("mXNgrxeBx2tiTCh1XxMREergiJ3XgK7YZhNvLA2e5wJ");
+declare_id!("SCWJ6A48uueEiDN9a88bWoee4R3FSYsazoL9fjP3tHF");
 
 #[component_deserialize]
 pub struct PickupData {
