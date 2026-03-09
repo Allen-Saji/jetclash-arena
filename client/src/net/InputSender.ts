@@ -5,15 +5,16 @@ import type { InputAction, NetworkConfig } from './types';
 
 /**
  * Sends player input transactions to the on-chain process-input system.
- * Runs at 30Hz — captures current keyboard state and fires async TXs.
+ * Runs at 30Hz -- captures current keyboard state and fires async TXs.
  */
 export class InputSender {
   private wallet: WalletProvider;
   private config: NetworkConfig;
   private worldPda: PublicKey;
-  private playerEntity: PublicKey;
+  private playerPoolEntity: PublicKey;
   private matchEntity: PublicKey;
   private projectileEntity: PublicKey;
+  private playerIndex: number;
   private inputSeq: number = 0;
   private sendInterval: number | null = null;
   private pendingInputs: InputAction[] = [];
@@ -24,28 +25,28 @@ export class InputSender {
     config: NetworkConfig,
     worldPda: PublicKey,
     entities: {
-      player: PublicKey;
+      playerPool: PublicKey;
       match: PublicKey;
       projectile: PublicKey;
     },
+    playerIndex: number,
     getInput: () => InputAction,
   ) {
     this.wallet = wallet;
     this.config = config;
     this.worldPda = worldPda;
-    this.playerEntity = entities.player;
+    this.playerPoolEntity = entities.playerPool;
     this.matchEntity = entities.match;
     this.projectileEntity = entities.projectile;
+    this.playerIndex = playerIndex;
     this.getInput = getInput;
   }
 
-  /** Start sending inputs at 30Hz */
-  start(): void {
+  start(rateHz: number = 20): void {
     if (this.sendInterval !== null) return;
-    this.sendInterval = window.setInterval(() => this.tick(), 1000 / 30);
+    this.sendInterval = window.setInterval(() => this.tick(), 1000 / rateHz);
   }
 
-  /** Stop sending inputs */
   stop(): void {
     if (this.sendInterval !== null) {
       clearInterval(this.sendInterval);
@@ -53,18 +54,22 @@ export class InputSender {
     }
   }
 
-  /** Get unacknowledged inputs for client prediction reconciliation */
   getPendingInputs(): InputAction[] {
     return [...this.pendingInputs];
   }
 
-  /** Mark inputs as acknowledged up to the given seq */
   acknowledgeUpTo(seq: number): void {
     this.pendingInputs = this.pendingInputs.filter((i) => i.inputSeq > seq);
   }
 
   private async tick(): Promise<void> {
     const rawInput = this.getInput();
+
+    // Skip sending if no meaningful input (avoid idle TX spam)
+    if (rawInput.moveDir === 0 && !rawInput.jet && !rawInput.dash && !rawInput.shootPrimary && !rawInput.shootSecondary) {
+      return;
+    }
+
     this.inputSeq++;
 
     const input: InputAction = {
@@ -74,7 +79,6 @@ export class InputSender {
 
     this.pendingInputs.push(input);
 
-    // Fire and forget — don't await, keep the 30Hz cadence
     this.sendInput(input).catch((err) => {
       console.warn('[InputSender] TX failed:', err.message);
     });
@@ -82,6 +86,7 @@ export class InputSender {
 
   private async sendInput(input: InputAction): Promise<void> {
     const args = {
+      player_index: this.playerIndex,
       move_dir: input.moveDir,
       jet: input.jet,
       dash: input.dash,
@@ -96,8 +101,8 @@ export class InputSender {
       world: this.worldPda,
       entities: [
         {
-          entity: this.playerEntity,
-          components: [{ componentId: this.config.programIds.playerState }],
+          entity: this.playerPoolEntity,
+          components: [{ componentId: this.config.programIds.playerPool }],
         },
         {
           entity: this.matchEntity,
@@ -111,6 +116,6 @@ export class InputSender {
       args,
     });
 
-    await this.wallet.sendTransaction(applySystem.transaction);
+    await this.wallet.sendTransactionFast(applySystem.transaction, 'ProcessInput');
   }
 }

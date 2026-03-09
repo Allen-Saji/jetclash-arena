@@ -29,10 +29,11 @@ export interface WeaponStats {
 
 export interface MatchState {
   timeRemaining: number;
-  scores: { p1: number; p2: number };
-  kills: { p1: number; p2: number };
+  playerCount: number;
+  scores: number[];      // per-player scores indexed by slot
+  kills: number[];       // per-player kills indexed by slot
   isActive: boolean;
-  winner: 1 | 2 | null;
+  winner: number | null;  // 0=none, 1-4=player slot+1, 5=draw
 }
 
 export interface PickupConfig {
@@ -43,4 +44,4 @@ export interface PickupConfig {
   respawnTime: number;
 }
 
-export type SceneKey = 'Boot' | 'MainMenu' | 'Arena' | 'Result';
+export type SceneKey = 'Boot' | 'MainMenu' | 'Arena' | 'Lobby' | 'OnlineArena' | 'Result';

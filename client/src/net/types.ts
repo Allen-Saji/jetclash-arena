@@ -1,8 +1,9 @@
 import { PublicKey } from '@solana/web3.js';
 
-/** On-chain player state deserialized from BOLT component */
-export interface OnChainPlayerState {
-  playerAuthority: PublicKey;
+export const MAX_PLAYERS = 4;
+
+/** On-chain player data deserialized from PlayerPool component */
+export interface OnChainPlayerData {
   posX: number;
   posY: number;
   velX: number;
@@ -28,19 +29,20 @@ export interface OnChainPlayerState {
   kills: number;
   deaths: number;
   score: number;
+  playerIndex: number;
+  isJoined: boolean;
+  characterId: number;
 }
 
 /** On-chain match state */
 export interface OnChainMatchState {
-  matchId: PublicKey;
-  player1: PublicKey;
-  player2: PublicKey;
+  players: PublicKey[];
+  playerCount: number;
+  readyMask: number;
+  isLobby: boolean;
+  minPlayers: number;
   tick: number;
   ticksRemaining: number;
-  p1Score: number;
-  p2Score: number;
-  p1Kills: number;
-  p2Kills: number;
   isActive: boolean;
   winner: number;
 }
@@ -80,8 +82,7 @@ export interface InputAction {
 /** Full snapshot of on-chain game state */
 export interface GameStateSnapshot {
   match: OnChainMatchState;
-  player1: OnChainPlayerState;
-  player2: OnChainPlayerState;
+  players: OnChainPlayerData[];
   projectiles: OnChainProjectile[];
   pickups: OnChainPickup[];
   timestamp: number;
@@ -91,8 +92,12 @@ export interface GameStateSnapshot {
 export interface NetworkConfig {
   rpcUrl: string;
   wsUrl: string;
+  /** Ephemeral Rollup RPC URL for gameplay (state sync + crank). Falls back to rpcUrl if unset. */
+  erRpcUrl?: string;
+  /** Ephemeral Rollup WebSocket URL for subscriptions. Falls back to wsUrl if unset. */
+  erWsUrl?: string;
   programIds: {
-    playerState: PublicKey;
+    playerPool: PublicKey;
     matchState: PublicKey;
     arenaConfig: PublicKey;
     projectilePool: PublicKey;
@@ -101,11 +106,23 @@ export interface NetworkConfig {
     tickPhysics: PublicKey;
     tickCombat: PublicKey;
     tickPickups: PublicKey;
+    tickProjectiles: PublicKey;
     delegateMatch: PublicKey;
     settleMatch: PublicKey;
     initArena: PublicKey;
     createMatch: PublicKey;
+    joinMatch: PublicKey;
+    readyUp: PublicKey;
+    startMatch: PublicKey;
   };
+}
+
+/** Platform AABB matching on-chain ArenaConfig */
+export interface PlatformAABB {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /** Scale factor: on-chain values use *100 fixed-point */

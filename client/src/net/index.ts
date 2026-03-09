@@ -5,10 +5,11 @@ export { ClientPrediction } from './ClientPrediction';
 export type {
   InputAction,
   GameStateSnapshot,
-  OnChainPlayerState,
+  OnChainPlayerData,
   OnChainMatchState,
   OnChainProjectile,
   OnChainPickup,
   NetworkConfig,
+  PlatformAABB,
 } from './types';
-export { toPixel, toOnChain, SCALE } from './types';
+export { toPixel, toOnChain, SCALE, MAX_PLAYERS } from './types';
