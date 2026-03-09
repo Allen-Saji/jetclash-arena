@@ -10,14 +10,18 @@ create-match = "4vrZHTpdz97cCtyhbQuAd2XmvipjuyBQGzqfF4SEgrKX"
 init-arena = "Ep4V1sF7RM1o2kBwQG3y86oxrYhd9F9FaCfjdfBYwSyh"
 match-state = "23fHYfpHxeCdc38an2CzTkkoGAinN45XodaxVpofuJ1y"
 pickup-state = "mXNgrxeBx2tiTCh1XxMREergiJ3XgK7YZhNvLA2e5wJ"
-player-state = "SVqcqnh6iqyyUTpzLPpV2zjY2eh96wjDkt8Cvs8feoF"
-process-input = "BnhdpxbxwTx4EABpRazimuSR9FGmQADAVdzi8HkDXAaG"
+player-pool = "11111111111111111111111111111112"
 projectile-pool = "3vwaQkFZVMvpPFuMvTtUfa1qwrbBDPrLCZhXVtcA4DC8"
+process-input = "BnhdpxbxwTx4EABpRazimuSR9FGmQADAVdzi8HkDXAaG"
 tick-combat = "BRdU8TEqfja1aCwhpTznxs7N5wtsEK9XwMrQpgAcXYj"
 tick-physics = "BHwje821iKJ3TCWwtRCQkiuBefJym41zRePDwQQ5ci6r"
 tick-pickups = "6svTwtJNorS61WgrVuBUeJGFZZCniK5zifffikmjZDqQ"
 delegate-match = "EM73uGdmeq4tev2BwpwZpsbrqkYf4Uf6E2pzSXKPwQ1C"
 settle-match = "juvewJJY9UutyiH5jGJ2BS3n2RcWNhcKfMHwVvr6quz"
+join-match = "11111111111111111111111111111112"
+ready-up = "11111111111111111111111111111112"
+start-match = "11111111111111111111111111111112"
+tick-projectiles = "11111111111111111111111111111112"
 
 [registry]
 url = "https://api.apr.dev"
@@ -28,24 +32,28 @@ create-match = "4vrZHTpdz97cCtyhbQuAd2XmvipjuyBQGzqfF4SEgrKX"
 init-arena = "Ep4V1sF7RM1o2kBwQG3y86oxrYhd9F9FaCfjdfBYwSyh"
 match-state = "23fHYfpHxeCdc38an2CzTkkoGAinN45XodaxVpofuJ1y"
 pickup-state = "mXNgrxeBx2tiTCh1XxMREergiJ3XgK7YZhNvLA2e5wJ"
-player-state = "SVqcqnh6iqyyUTpzLPpV2zjY2eh96wjDkt8Cvs8feoF"
-process-input = "BnhdpxbxwTx4EABpRazimuSR9FGmQADAVdzi8HkDXAaG"
+player-pool = "11111111111111111111111111111112"
 projectile-pool = "3vwaQkFZVMvpPFuMvTtUfa1qwrbBDPrLCZhXVtcA4DC8"
+process-input = "BnhdpxbxwTx4EABpRazimuSR9FGmQADAVdzi8HkDXAaG"
 tick-combat = "BRdU8TEqfja1aCwhpTznxs7N5wtsEK9XwMrQpgAcXYj"
 tick-physics = "BHwje821iKJ3TCWwtRCQkiuBefJym41zRePDwQQ5ci6r"
 tick-pickups = "6svTwtJNorS61WgrVuBUeJGFZZCniK5zifffikmjZDqQ"
+tick-projectiles = "11111111111111111111111111111112"
 delegate-match = "EM73uGdmeq4tev2BwpwZpsbrqkYf4Uf6E2pzSXKPwQ1C"
 settle-match = "juvewJJY9UutyiH5jGJ2BS3n2RcWNhcKfMHwVvr6quz"
+join-match = "11111111111111111111111111111112"
+ready-up = "11111111111111111111111111111112"
+start-match = "11111111111111111111111111111112"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [workspace]
 members = ["programs-ecs/components/*", "programs-ecs/systems/*"]
 
 [scripts]
-test = "npx ts-mocha -p ./tsconfig.anchor.json -t 1000000 tests/**/*.ts"
+test = "npx ts-mocha -p ./tsconfig.anchor.json -t 1000000 tests/jetclash.ts"
 
 [test]
 startup_wait = 10000

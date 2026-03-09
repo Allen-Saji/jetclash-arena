@@ -685,7 +685,7 @@ dependencies = [
  "bolt-lang",
  "match-state",
  "pickup-state",
- "player-state",
+ "player-pool",
  "projectile-pool",
  "serde",
  "serde_json",
@@ -1135,6 +1135,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
 
 [[package]]
+name = "join-match"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "match-state",
+ "player-pool",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1406,7 +1417,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "player-state"
+name = "player-pool"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
@@ -1454,7 +1465,7 @@ version = "0.2.4"
 dependencies = [
  "bolt-lang",
  "match-state",
- "player-state",
+ "player-pool",
  "projectile-pool",
  "serde",
  "serde_json",
@@ -1545,6 +1556,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 dependencies = [
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "ready-up"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "match-state",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1734,7 +1755,7 @@ version = "0.2.4"
 dependencies = [
  "bolt-lang",
  "match-state",
- "player-state",
+ "player-pool",
 ]
 
 [[package]]
@@ -3249,6 +3270,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "start-match"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "match-state",
+ "pickup-state",
+ "player-pool",
+ "projectile-pool",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3332,10 +3366,9 @@ dependencies = [
 name = "tick-combat"
 version = "0.2.4"
 dependencies = [
- "arena-config",
  "bolt-lang",
  "match-state",
- "player-state",
+ "player-pool",
  "projectile-pool",
  "serde",
 ]
@@ -3347,7 +3380,7 @@ dependencies = [
  "arena-config",
  "bolt-lang",
  "match-state",
- "player-state",
+ "player-pool",
  "serde",
 ]
 
@@ -3358,8 +3391,17 @@ dependencies = [
  "bolt-lang",
  "match-state",
  "pickup-state",
- "player-state",
+ "player-pool",
  "serde",
+]
+
+[[package]]
+name = "tick-projectiles"
+version = "0.2.4"
+dependencies = [
+ "arena-config",
+ "bolt-lang",
+ "projectile-pool",
 ]
 
 [[package]]
