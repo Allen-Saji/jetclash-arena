@@ -24,8 +24,9 @@ export class ArenaScene extends Phaser.Scene {
 
   private matchState: MatchState = {
     timeRemaining: MATCH_DURATION,
-    scores: { p1: 0, p2: 0 },
-    kills: { p1: 0, p2: 0 },
+    playerCount: 2,
+    scores: [0, 0],
+    kills: [0, 0],
     isActive: false,
     winner: null,
   };
@@ -43,8 +44,9 @@ export class ArenaScene extends Phaser.Scene {
     // Reset match state
     this.matchState = {
       timeRemaining: MATCH_DURATION,
-      scores: { p1: 0, p2: 0 },
-      kills: { p1: 0, p2: 0 },
+      playerCount: 2,
+      scores: [0, 0],
+      kills: [0, 0],
       isActive: false,
       winner: null,
     };
@@ -256,13 +258,9 @@ export class ArenaScene extends Phaser.Scene {
   private onPlayerKill(killerId: 1 | 2, victim: Player): void {
     sfx.kill();
 
-    if (killerId === 1) {
-      this.matchState.kills.p1++;
-      this.matchState.scores.p1 += KILL_SCORE;
-    } else {
-      this.matchState.kills.p2++;
-      this.matchState.scores.p2 += KILL_SCORE;
-    }
+    const idx = killerId - 1; // 1-based to 0-based
+    this.matchState.kills[idx]++;
+    this.matchState.scores[idx] += KILL_SCORE;
 
     // Respawn after delay
     this.time.delayedCall(2500, () => {
@@ -273,7 +271,7 @@ export class ArenaScene extends Phaser.Scene {
     });
 
     // Check kill cap
-    if (this.matchState.kills.p1 >= KILL_CAP || this.matchState.kills.p2 >= KILL_CAP) {
+    if (this.matchState.kills[0] >= KILL_CAP || this.matchState.kills[1] >= KILL_CAP) {
       this.endMatch();
     }
   }
@@ -373,12 +371,12 @@ export class ArenaScene extends Phaser.Scene {
     sfx.matchEnd();
 
     // Determine winner
-    if (this.matchState.scores.p1 > this.matchState.scores.p2) {
+    if (this.matchState.scores[0] > this.matchState.scores[1]) {
       this.matchState.winner = 1;
-    } else if (this.matchState.scores.p2 > this.matchState.scores.p1) {
+    } else if (this.matchState.scores[1] > this.matchState.scores[0]) {
       this.matchState.winner = 2;
     } else {
-      this.matchState.winner = this.matchState.kills.p1 >= this.matchState.kills.p2 ? 1 : 2;
+      this.matchState.winner = this.matchState.kills[0] >= this.matchState.kills[1] ? 1 : 2;
     }
 
     this.time.delayedCall(1500, () => {
@@ -467,7 +465,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.handleShooting();
-    this.hud.update(this.player1, this.player2, this.matchState);
+    this.hud.update([this.player1, this.player2], this.matchState);
 
     // Camera: smooth follow midpoint between players
     const midX = (this.player1.sprite.x + this.player2.sprite.x) / 2;

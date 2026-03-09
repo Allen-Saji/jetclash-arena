@@ -8,6 +8,13 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Auto-route to lobby if ?room= URL param is present
+    const roomParam = new URLSearchParams(window.location.search).get('room');
+    if (roomParam) {
+      this.scene.start('Lobby', { roomCode: roomParam });
+      return;
+    }
+
     // Init audio on first user interaction
     this.input.once('pointerdown', () => sfx.init());
 
@@ -57,7 +64,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.createModeButton(GAME_WIDTH / 2, 480, 'ONLINE', '#44bb66', () => {
       sfx.menuClick();
       this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.time.delayedCall(300, () => this.scene.start('OnlineArena'));
+      this.time.delayedCall(300, () => this.scene.start('Lobby'));
     });
 
     // Controls info
