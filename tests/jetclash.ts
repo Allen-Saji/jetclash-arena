@@ -1,5 +1,5 @@
-import { PublicKey } from "@solana/web3.js";
-import { PlayerState } from "../target/types/player_state";
+import { PublicKey, Keypair } from "@solana/web3.js";
+import { PlayerPool } from "../target/types/player_pool";
 import { MatchState } from "../target/types/match_state";
 import { ArenaConfig } from "../target/types/arena_config";
 import { ProjectilePool } from "../target/types/projectile_pool";
@@ -10,6 +10,11 @@ import { ProcessInput } from "../target/types/process_input";
 import { TickPhysics } from "../target/types/tick_physics";
 import { TickCombat } from "../target/types/tick_combat";
 import { TickPickups } from "../target/types/tick_pickups";
+import { TickProjectiles } from "../target/types/tick_projectiles";
+import { JoinMatch } from "../target/types/join_match";
+import { ReadyUp } from "../target/types/ready_up";
+import { StartMatch } from "../target/types/start_match";
+import { SettleMatch } from "../target/types/settle_match";
 import {
   InitializeNewWorld,
   AddEntity,
@@ -20,26 +25,24 @@ import {
 import { expect } from "chai";
 import * as anchor from "@coral-xyz/anchor";
 
-describe("JetClash Arena On-Chain", () => {
+describe("JetClash Arena On-Chain (4-Player)", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   let worldPda: PublicKey;
   let matchEntity: PublicKey;
-  let p1Entity: PublicKey;
-  let p2Entity: PublicKey;
+  let playerPoolEntity: PublicKey;
   let projectileEntity: PublicKey;
   let pickupEntity: PublicKey;
   let arenaEntity: PublicKey;
 
   let matchStatePda: PublicKey;
-  let p1StatePda: PublicKey;
-  let p2StatePda: PublicKey;
+  let playerPoolPda: PublicKey;
   let projectilePoolPda: PublicKey;
   let pickupStatePda: PublicKey;
   let arenaConfigPda: PublicKey;
 
-  const playerStateComp = anchor.workspace.PlayerState as Program<PlayerState>;
+  const playerPoolComp = anchor.workspace.PlayerPool as Program<PlayerPool>;
   const matchStateComp = anchor.workspace.MatchState as Program<MatchState>;
   const arenaConfigComp = anchor.workspace.ArenaConfig as Program<ArenaConfig>;
   const projectilePoolComp = anchor.workspace.ProjectilePool as Program<ProjectilePool>;
@@ -51,20 +54,29 @@ describe("JetClash Arena On-Chain", () => {
   const tickPhysicsSys = anchor.workspace.TickPhysics as Program<TickPhysics>;
   const tickCombatSys = anchor.workspace.TickCombat as Program<TickCombat>;
   const tickPickupsSys = anchor.workspace.TickPickups as Program<TickPickups>;
+  const tickProjectilesSys = anchor.workspace.TickProjectiles as Program<TickProjectiles>;
+  const joinMatchSys = anchor.workspace.JoinMatch as Program<JoinMatch>;
+  const readyUpSys = anchor.workspace.ReadyUp as Program<ReadyUp>;
+  const startMatchSys = anchor.workspace.StartMatch as Program<StartMatch>;
+  const settleMatchSys = anchor.workspace.SettleMatch as Program<SettleMatch>;
+
+  const player2Kp = Keypair.generate();
+
+  // ─── Setup ──────────────────────────────────────────────────
 
   it("Initialize world", async () => {
     const initNewWorld = await InitializeNewWorld({
       payer: provider.wallet.publicKey,
       connection: provider.connection,
     });
-    const txSign = await provider.sendAndConfirm(initNewWorld.transaction);
+    await provider.sendAndConfirm(initNewWorld.transaction);
     worldPda = initNewWorld.worldPda;
     console.log(`  World: ${worldPda}`);
   });
 
-  it("Create entities", async () => {
+  it("Create 5 entities", async () => {
     const entities: PublicKey[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       const addEntity = await AddEntity({
         payer: provider.wallet.publicKey,
         world: worldPda,
@@ -73,18 +85,17 @@ describe("JetClash Arena On-Chain", () => {
       await provider.sendAndConfirm(addEntity.transaction);
       entities.push(addEntity.entityPda);
     }
-    [matchEntity, p1Entity, p2Entity, projectileEntity, pickupEntity, arenaEntity] = entities;
-    console.log(`  Created 6 entities`);
+    [matchEntity, playerPoolEntity, projectileEntity, pickupEntity, arenaEntity] = entities;
+    console.log(`  Created 5 entities`);
   });
 
-  it("Initialize components", async () => {
+  it("Initialize 5 components", async () => {
     const inits = [
-      { entity: matchEntity, comp: matchStateComp, name: "matchState" },
-      { entity: p1Entity, comp: playerStateComp, name: "p1State" },
-      { entity: p2Entity, comp: playerStateComp, name: "p2State" },
-      { entity: projectileEntity, comp: projectilePoolComp, name: "projectilePool" },
-      { entity: pickupEntity, comp: pickupStateComp, name: "pickupState" },
-      { entity: arenaEntity, comp: arenaConfigComp, name: "arenaConfig" },
+      { entity: matchEntity, comp: matchStateComp },
+      { entity: playerPoolEntity, comp: playerPoolComp },
+      { entity: projectileEntity, comp: projectilePoolComp },
+      { entity: pickupEntity, comp: pickupStateComp },
+      { entity: arenaEntity, comp: arenaConfigComp },
     ];
 
     const pdas: PublicKey[] = [];
@@ -97,11 +108,13 @@ describe("JetClash Arena On-Chain", () => {
       await provider.sendAndConfirm(result.transaction);
       pdas.push(result.componentPda);
     }
-    [matchStatePda, p1StatePda, p2StatePda, projectilePoolPda, pickupStatePda, arenaConfigPda] = pdas;
-    console.log(`  All 6 components initialized`);
+    [matchStatePda, playerPoolPda, projectilePoolPda, pickupStatePda, arenaConfigPda] = pdas;
+    console.log(`  All 5 components initialized`);
   });
 
-  it("Init arena (2 components: ArenaConfig + PickupState)", async () => {
+  // ─── Arena Init ─────────────────────────────────────────────
+
+  it("Init arena", async () => {
     const arenaArgs = {
       platforms: [
         { x: 0, y: 138000, w: 256000, h: 6000 },
@@ -112,6 +125,8 @@ describe("JetClash Arena On-Chain", () => {
       spawn_points: [
         { x: 50000, y: 132000 },
         { x: 206000, y: 132000 },
+        { x: 80000, y: 100000 },
+        { x: 170000, y: 100000 },
       ],
       pickup_positions: [
         { x: 40000, y: 101000, pickup_type: 0 },
@@ -138,16 +153,18 @@ describe("JetClash Arena On-Chain", () => {
     const arenaData = await arenaConfigComp.account.arenaConfig.fetch(arenaConfigPda);
     expect(arenaData.worldWidth).to.equal(256000);
     expect(arenaData.platformCount).to.equal(4);
-    expect(arenaData.spawnPointCount).to.equal(2);
+    expect(arenaData.spawnPointCount).to.equal(4);
     console.log(`  Arena: ${arenaData.platformCount} platforms, ${arenaData.spawnPointCount} spawns`);
   });
 
-  it("Create match (5 components: Match + P1 + P2 + Pool + Pickups)", async () => {
+  // ─── Lobby Flow ─────────────────────────────────────────────
+
+  it("Create match (lobby)", async () => {
+    const hostKey = provider.wallet.publicKey;
     const createArgs = {
-      p1_spawn_x: 50000,
-      p1_spawn_y: 132000,
-      p2_spawn_x: 206000,
-      p2_spawn_y: 132000,
+      host_authority: Array.from(hostKey.toBytes()),
+      character_id: 0,
+      min_players: 2,
     };
 
     const applySystem = await ApplySystem({
@@ -156,8 +173,7 @@ describe("JetClash Arena On-Chain", () => {
       world: worldPda,
       entities: [
         { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
-        { entity: p1Entity, components: [{ componentId: playerStateComp.programId }] },
-        { entity: p2Entity, components: [{ componentId: playerStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
         { entity: projectileEntity, components: [{ componentId: projectilePoolComp.programId }] },
         { entity: pickupEntity, components: [{ componentId: pickupStateComp.programId }] },
       ],
@@ -166,24 +182,121 @@ describe("JetClash Arena On-Chain", () => {
     await provider.sendAndConfirm(applySystem.transaction);
 
     const matchData = await matchStateComp.account.matchState.fetch(matchStatePda);
-    expect(matchData.isActive).to.be.true;
-    expect(matchData.ticksRemaining).to.equal(3600);
+    expect(matchData.isLobby).to.be.true;
+    expect(matchData.isActive).to.be.false;
+    expect(matchData.playerCount).to.equal(1);
+    expect(matchData.players[0].toBase58()).to.equal(hostKey.toBase58());
+    console.log(`  Lobby created, host=${hostKey.toBase58().slice(0, 8)}..., players=${matchData.playerCount}`);
 
-    const p1 = await playerStateComp.account.playerState.fetch(p1StatePda);
-    expect(p1.hp).to.equal(100);
-    expect(p1.posX).to.equal(50000);
-    expect(p1.posY).to.equal(132000);
-    expect(p1.facingRight).to.be.true;
-    console.log(`  Match active, P1 at (${p1.posX}, ${p1.posY})`);
-
-    const p2 = await playerStateComp.account.playerState.fetch(p2StatePda);
-    expect(p2.posX).to.equal(206000);
-    expect(p2.facingRight).to.be.false;
-    console.log(`  P2 at (${p2.posX}, ${p2.posY})`);
+    const poolData = await playerPoolComp.account.playerPool.fetch(playerPoolPda);
+    const p0 = (poolData.players as any[])[0];
+    expect(p0.isJoined).to.be.true;
+    expect(p0.hp).to.equal(100);
+    console.log(`  Host auto-joined as player 0`);
   });
 
-  it("Process input - P1 moves right (3 components)", async () => {
+  it("Player 2 joins match", async () => {
+    const joinArgs = {
+      player_authority: Array.from(player2Kp.publicKey.toBytes()),
+      character_id: 1,
+    };
+
+    const applySystem = await ApplySystem({
+      authority: provider.wallet.publicKey,
+      systemId: joinMatchSys.programId,
+      world: worldPda,
+      entities: [
+        { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
+      ],
+      args: joinArgs,
+    });
+    await provider.sendAndConfirm(applySystem.transaction);
+
+    const matchData = await matchStateComp.account.matchState.fetch(matchStatePda);
+    expect(matchData.playerCount).to.equal(2);
+
+    const poolData = await playerPoolComp.account.playerPool.fetch(playerPoolPda);
+    const p1 = (poolData.players as any[])[1];
+    expect(p1.isJoined).to.be.true;
+    expect(p1.characterId).to.equal(1);
+    console.log(`  Player 2 joined, count=${matchData.playerCount}`);
+  });
+
+  it("Both players ready up", async () => {
+    // Player 0 ready
+    const applyR0 = await ApplySystem({
+      authority: provider.wallet.publicKey,
+      systemId: readyUpSys.programId,
+      world: worldPda,
+      entities: [
+        { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
+      ],
+      args: { player_index: 0 },
+    });
+    await provider.sendAndConfirm(applyR0.transaction);
+
+    // Player 1 ready
+    const applyR1 = await ApplySystem({
+      authority: provider.wallet.publicKey,
+      systemId: readyUpSys.programId,
+      world: worldPda,
+      entities: [
+        { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
+      ],
+      args: { player_index: 1 },
+    });
+    await provider.sendAndConfirm(applyR1.transaction);
+
+    const matchData = await matchStateComp.account.matchState.fetch(matchStatePda);
+    expect(matchData.readyMask).to.equal(3); // 0b11
+    console.log(`  Ready mask: ${matchData.readyMask.toString(2)}`);
+  });
+
+  it("Start match", async () => {
+    const startArgs = {
+      spawn_positions: [
+        [50000, 132000],
+        [206000, 132000],
+        [80000, 100000],
+        [170000, 100000],
+      ],
+    };
+
+    const applySystem = await ApplySystem({
+      authority: provider.wallet.publicKey,
+      systemId: startMatchSys.programId,
+      world: worldPda,
+      entities: [
+        { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
+        { entity: projectileEntity, components: [{ componentId: projectilePoolComp.programId }] },
+        { entity: pickupEntity, components: [{ componentId: pickupStateComp.programId }] },
+      ],
+      args: startArgs,
+    });
+    await provider.sendAndConfirm(applySystem.transaction);
+
+    const matchData = await matchStateComp.account.matchState.fetch(matchStatePda);
+    expect(matchData.isActive).to.be.true;
+    expect(matchData.isLobby).to.be.false;
+    expect(matchData.ticksRemaining).to.equal(3600);
+
+    const poolData = await playerPoolComp.account.playerPool.fetch(playerPoolPda);
+    const p0 = (poolData.players as any[])[0];
+    expect(p0.posX).to.equal(50000);
+    expect(p0.hp).to.equal(100);
+    expect(p0.isInvincible).to.be.true;
+    const p1 = (poolData.players as any[])[1];
+    expect(p1.posX).to.equal(206000);
+    console.log(`  Match started! P0=(${p0.posX},${p0.posY}) P1=(${p1.posX},${p1.posY})`);
+  });
+
+  // ─── Gameplay ───────────────────────────────────────────────
+
+  it("Process input - P0 moves right", async () => {
     const inputArgs = {
+      player_index: 0,
       move_dir: 1, jet: false, dash: false,
       shoot_primary: false, shoot_secondary: false,
       input_seq: 1,
@@ -194,7 +307,7 @@ describe("JetClash Arena On-Chain", () => {
       systemId: processInputSys.programId,
       world: worldPda,
       entities: [
-        { entity: p1Entity, components: [{ componentId: playerStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
         { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
         { entity: projectileEntity, components: [{ componentId: projectilePoolComp.programId }] },
       ],
@@ -202,21 +315,21 @@ describe("JetClash Arena On-Chain", () => {
     });
     await provider.sendAndConfirm(applySystem.transaction);
 
-    const p1 = await playerStateComp.account.playerState.fetch(p1StatePda);
-    expect(p1.velX).to.be.greaterThan(0);
-    expect(p1.inputSeq).to.equal(1);
-    console.log(`  P1 vel_x=${p1.velX}, input_seq=${p1.inputSeq}`);
+    const poolData = await playerPoolComp.account.playerPool.fetch(playerPoolPda);
+    const p0 = (poolData.players as any[])[0];
+    expect(p0.velX).to.be.greaterThan(0);
+    expect(p0.inputSeq).to.equal(1);
+    console.log(`  P0 vel_x=${p0.velX}, input_seq=${p0.inputSeq}`);
   });
 
-  it("Tick physics (4 components: Match + P1 + P2 + Arena)", async () => {
+  it("Tick physics", async () => {
     const applySystem = await ApplySystem({
       authority: provider.wallet.publicKey,
       systemId: tickPhysicsSys.programId,
       world: worldPda,
       entities: [
         { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
-        { entity: p1Entity, components: [{ componentId: playerStateComp.programId }] },
-        { entity: p2Entity, components: [{ componentId: playerStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
         { entity: arenaEntity, components: [{ componentId: arenaConfigComp.programId }] },
       ],
     });
@@ -226,13 +339,15 @@ describe("JetClash Arena On-Chain", () => {
     expect(matchData.tick).to.equal(1);
     expect(matchData.ticksRemaining).to.equal(3599);
 
-    const p1 = await playerStateComp.account.playerState.fetch(p1StatePda);
-    expect(p1.posX).to.be.greaterThan(50000);
-    console.log(`  Tick=${matchData.tick}, P1 pos=(${p1.posX}, ${p1.posY})`);
+    const poolData = await playerPoolComp.account.playerPool.fetch(playerPoolPda);
+    const p0 = (poolData.players as any[])[0];
+    expect(p0.posX).to.be.greaterThan(50000);
+    console.log(`  Tick=${matchData.tick}, P0 pos=(${p0.posX}, ${p0.posY})`);
   });
 
-  it("Process input - P1 shoots (3 components)", async () => {
+  it("Process input - P0 shoots", async () => {
     const inputArgs = {
+      player_index: 0,
       move_dir: 0, jet: false, dash: false,
       shoot_primary: true, shoot_secondary: false,
       input_seq: 2,
@@ -243,7 +358,7 @@ describe("JetClash Arena On-Chain", () => {
       systemId: processInputSys.programId,
       world: worldPda,
       entities: [
-        { entity: p1Entity, components: [{ componentId: playerStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
         { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
         { entity: projectileEntity, components: [{ componentId: projectilePoolComp.programId }] },
       ],
@@ -251,49 +366,61 @@ describe("JetClash Arena On-Chain", () => {
     });
     await provider.sendAndConfirm(applySystem.transaction);
 
-    const p1 = await playerStateComp.account.playerState.fetch(p1StatePda);
-    expect(p1.primaryAmmo).to.equal(49);
+    const poolData = await playerPoolComp.account.playerPool.fetch(playerPoolPda);
+    const p0 = (poolData.players as any[])[0];
+    expect(p0.primaryAmmo).to.equal(49);
 
-    const pool = await projectilePoolComp.account.projectilePool.fetch(projectilePoolPda);
-    const active = (pool.projectiles as any[]).filter((p: any) => p.active);
+    const projPool = await projectilePoolComp.account.projectilePool.fetch(projectilePoolPda);
+    const active = (projPool.projectiles as any[]).filter((p: any) => p.active);
     expect(active.length).to.equal(1);
     expect(active[0].owner).to.equal(0);
     expect(active[0].damage).to.equal(12);
-    console.log(`  Bullet fired: vel_x=${active[0].velX}, ammo=${p1.primaryAmmo}`);
+    console.log(`  Bullet fired: vel_x=${active[0].velX}, ammo=${p0.primaryAmmo}`);
   });
 
-  it("Tick combat - projectile moves (5 components)", async () => {
+  it("Tick projectiles - move and check bounds", async () => {
     const applySystem = await ApplySystem({
       authority: provider.wallet.publicKey,
-      systemId: tickCombatSys.programId,
+      systemId: tickProjectilesSys.programId,
       world: worldPda,
       entities: [
-        { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
-        { entity: p1Entity, components: [{ componentId: playerStateComp.programId }] },
-        { entity: p2Entity, components: [{ componentId: playerStateComp.programId }] },
         { entity: projectileEntity, components: [{ componentId: projectilePoolComp.programId }] },
         { entity: arenaEntity, components: [{ componentId: arenaConfigComp.programId }] },
       ],
     });
     await provider.sendAndConfirm(applySystem.transaction);
 
-    const pool = await projectilePoolComp.account.projectilePool.fetch(projectilePoolPda);
-    const active = (pool.projectiles as any[]).filter((p: any) => p.active);
+    const projPool = await projectilePoolComp.account.projectilePool.fetch(projectilePoolPda);
+    const active = (projPool.projectiles as any[]).filter((p: any) => p.active);
     if (active.length > 0) {
       console.log(`  Projectile at (${active[0].posX}, ${active[0].posY}), ttl=${active[0].ttlTicks}`);
     }
-    console.log(`  Combat tick complete, ${active.length} active projectiles`);
+    console.log(`  Projectile tick complete, ${active.length} active projectiles`);
   });
 
-  it("Tick pickups (4 components)", async () => {
+  it("Tick combat - player collision", async () => {
+    const applySystem = await ApplySystem({
+      authority: provider.wallet.publicKey,
+      systemId: tickCombatSys.programId,
+      world: worldPda,
+      entities: [
+        { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
+        { entity: projectileEntity, components: [{ componentId: projectilePoolComp.programId }] },
+      ],
+    });
+    await provider.sendAndConfirm(applySystem.transaction);
+    console.log(`  Combat tick complete`);
+  });
+
+  it("Tick pickups", async () => {
     const applySystem = await ApplySystem({
       authority: provider.wallet.publicKey,
       systemId: tickPickupsSys.programId,
       world: worldPda,
       entities: [
         { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
-        { entity: p1Entity, components: [{ componentId: playerStateComp.programId }] },
-        { entity: p2Entity, components: [{ componentId: playerStateComp.programId }] },
+        { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
         { entity: pickupEntity, components: [{ componentId: pickupStateComp.programId }] },
       ],
     });
@@ -302,5 +429,50 @@ describe("JetClash Arena On-Chain", () => {
     const pickups = await pickupStateComp.account.pickupState.fetch(pickupStatePda);
     const available = (pickups.pickups as any[]).filter((p: any) => !p.isConsumed);
     console.log(`  Pickup tick complete, ${available.length} available pickups`);
+  });
+
+  // ─── Multiple ticks ─────────────────────────────────────────
+
+  it("Run 5 physics ticks", async () => {
+    for (let i = 0; i < 5; i++) {
+      const applySystem = await ApplySystem({
+        authority: provider.wallet.publicKey,
+        systemId: tickPhysicsSys.programId,
+        world: worldPda,
+        entities: [
+          { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
+          { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
+          { entity: arenaEntity, components: [{ componentId: arenaConfigComp.programId }] },
+        ],
+      });
+      await provider.sendAndConfirm(applySystem.transaction);
+    }
+
+    const matchData = await matchStateComp.account.matchState.fetch(matchStatePda);
+    expect(matchData.tick).to.equal(6);
+    console.log(`  After 5 more ticks: tick=${matchData.tick}, remaining=${matchData.ticksRemaining}`);
+  });
+
+  // ─── Settle ─────────────────────────────────────────────────
+
+  it("Settle match (requires match ended)", async () => {
+    // Run ticks until match ends (fast forward by draining ticks_remaining)
+    // For test purposes, we just verify the error when trying to settle an active match
+    try {
+      const applySystem = await ApplySystem({
+        authority: provider.wallet.publicKey,
+        systemId: settleMatchSys.programId,
+        world: worldPda,
+        entities: [
+          { entity: matchEntity, components: [{ componentId: matchStateComp.programId }] },
+          { entity: playerPoolEntity, components: [{ componentId: playerPoolComp.programId }] },
+        ],
+      });
+      await provider.sendAndConfirm(applySystem.transaction);
+      expect.fail("Should have thrown - match still active");
+    } catch (e: any) {
+      expect(e.toString()).to.include("MatchStillActive");
+      console.log(`  Correctly rejected settle on active match`);
+    }
   });
 });
