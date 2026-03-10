@@ -1,18 +1,24 @@
 node_modules/
 dist/
 *.zip
-assets-raw/
-test-results/
-/tmp/
 .DS_Store
 
 # Anchor / BOLT build artifacts
 target/
 .anchor/
 .bolt/
+test-ledger/
 
-# MagicBlock test storage
+# MagicBlock
 magicblock-test-storage/
+er-config.toml
 
-# Client Rust crates (build artifact)
+# Test output
+test-results/
+/tmp/
+
+# Raw assets (large PSD/AI files)
+assets-raw/
+
+# Client build artifacts
 client/crates/
