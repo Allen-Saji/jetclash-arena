@@ -22,21 +22,14 @@ const PROGRAM_IDS = {
 };
 
 /**
- * Local dev: L1 validator on :7899, ER validator on :8899.
- * Lobby setup runs on L1. After delegation, gameplay runs on ER.
+ * Local dev: L1 only via mb-test-validator on :7899.
+ * No ER — local ER v0.7.0 has fee payer limitation (InvalidWritableAccount).
+ * All TXs (lobby, crank, input) run directly on L1.
+ * Use DEVNET_CONFIG for ER testing (MagicBlock devnet handles fees properly).
  */
 export const LOCAL_CONFIG: NetworkConfig = {
   rpcUrl: 'http://127.0.0.1:7899',
   wsUrl: 'ws://127.0.0.1:7900',
-  erRpcUrl: 'http://127.0.0.1:8899',
-  erWsUrl: 'ws://127.0.0.1:8900',
-  programIds: PROGRAM_IDS,
-};
-
-/** Local Ephemeral Rollup validator (:8899) -- direct ER connection */
-export const LOCAL_ER_CONFIG: NetworkConfig = {
-  rpcUrl: 'http://127.0.0.1:8899',
-  wsUrl: 'ws://127.0.0.1:8900',
   programIds: PROGRAM_IDS,
 };
 

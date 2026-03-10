@@ -71,34 +71,66 @@ export class StateSubscriber {
     });
 
     const conn = this.wsConnection;
+    let wsUpdateCount = 0;
 
     // Subscribe to each account — deserialize on change and emit unified snapshot
     const matchSub = conn.onAccountChange(this.matchStatePda, (acct) => {
-      this.wsMatch = deserializeMatchState(new Uint8Array(acct.data));
-      this.emitSnapshot();
+      try {
+        this.wsMatch = deserializeMatchState(new Uint8Array(acct.data));
+        wsUpdateCount++;
+        if (wsUpdateCount <= 3) console.log(`[StateSync] WS matchState update #${wsUpdateCount} tick=${this.wsMatch.tick}`);
+        this.emitSnapshot();
+      } catch (err: any) {
+        console.error('[StateSync] WS matchState deserialize error:', err.message);
+      }
     }, 'confirmed');
     this.subscriptionIds.push(matchSub);
 
     const playerSub = conn.onAccountChange(this.playerPoolPda, (acct) => {
-      this.wsPlayers = deserializePlayerPool(new Uint8Array(acct.data));
-      this.emitSnapshot();
+      try {
+        this.wsPlayers = deserializePlayerPool(new Uint8Array(acct.data));
+        wsUpdateCount++;
+        if (wsUpdateCount <= 6) {
+          const p0 = this.wsPlayers[0];
+          const p1 = this.wsPlayers[1];
+          console.log(`[StateSync] WS playerPool update: P0=(${p0.posX},${p0.posY}) joined=${p0.isJoined} P1=(${p1.posX},${p1.posY}) joined=${p1.isJoined}`);
+        }
+        this.emitSnapshot();
+      } catch (err: any) {
+        console.error('[StateSync] WS playerPool deserialize error:', err.message);
+      }
     }, 'confirmed');
     this.subscriptionIds.push(playerSub);
 
     const projSub = conn.onAccountChange(this.projectilePoolPda, (acct) => {
-      this.wsProjectiles = deserializeProjectilePool(new Uint8Array(acct.data));
-      this.emitSnapshot();
+      try {
+        this.wsProjectiles = deserializeProjectilePool(new Uint8Array(acct.data));
+        this.emitSnapshot();
+      } catch (err: any) {
+        console.error('[StateSync] WS projectilePool deserialize error:', err.message);
+      }
     }, 'confirmed');
     this.subscriptionIds.push(projSub);
 
     const pickupSub = conn.onAccountChange(this.pickupStatePda, (acct) => {
-      this.wsPickups = deserializePickupState(new Uint8Array(acct.data));
-      this.emitSnapshot();
+      try {
+        this.wsPickups = deserializePickupState(new Uint8Array(acct.data));
+        this.emitSnapshot();
+      } catch (err: any) {
+        console.error('[StateSync] WS pickupState deserialize error:', err.message);
+      }
     }, 'confirmed');
     this.subscriptionIds.push(pickupSub);
 
-    // Do an initial poll to seed the buffers
-    this.poll();
+    // Initial fetch to seed the buffers
+    this.poll().then(() => {
+      if (this.wsMatch && this.wsPlayers) {
+        const p0 = this.wsPlayers[0];
+        console.log(`[StateSync] Initial seed OK: tick=${this.wsMatch.tick} P0 joined=${p0.isJoined} pos=(${p0.posX},${p0.posY})`);
+      } else {
+        console.warn('[StateSync] Initial seed: matchState or playerPool missing');
+      }
+    });
   }
 
   private emitSnapshot(): void {
@@ -190,8 +222,8 @@ export class StateSubscriber {
 
       this.latestSnapshot = { match, players, projectiles, pickups, timestamp: Date.now() };
       this.callback(this.latestSnapshot);
-    } catch (_e) {
-      // silently retry next poll
+    } catch (err: any) {
+      console.warn('[StateSync] Poll error:', err.message?.slice(0, 150));
     }
   }
 }

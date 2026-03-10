@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import bs58 from 'bs58';
 import * as anchor from '@coral-xyz/anchor';
 import {
   InitializeNewWorld,
@@ -74,7 +75,9 @@ export class LobbyScene extends Phaser.Scene {
     sfx.init();
     // Use devnet config (Solana devnet L1 + MagicBlock ER)
     // Falls back to LOCAL_CONFIG if ?local query param is set
-    const useLocal = new URLSearchParams(window.location.search).has('local');
+    const params = new URLSearchParams(window.location.search);
+    const useLocal = params.has('local');
+    const useDevnetAuto = params.has('devnet'); // devnet with auto-generated keypair (no Phantom)
     this.config = useLocal ? LOCAL_CONFIG : DEVNET_CONFIG;
 
     // Background
@@ -87,7 +90,7 @@ export class LobbyScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Network indicator
-    const netLabel = useLocal ? 'LOCAL' : 'DEVNET';
+    const netLabel = useLocal ? 'LOCAL' : useDevnetAuto ? 'DEVNET-AUTO' : 'DEVNET';
     const netColor = useLocal ? '#ff6644' : '#44cc66';
     this.add.text(GAME_WIDTH - 20, 20, netLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: netColor,
@@ -175,19 +178,52 @@ export class LobbyScene extends Phaser.Scene {
 
   private showConnectWallet(pendingRoomCode?: string): void {
     const useLocal = this.config === LOCAL_CONFIG;
+    const useDevnetAuto = new URLSearchParams(window.location.search).has('devnet');
 
-    if (useLocal) {
-      // Local mode: auto-generate keypair + airdrop, skip wallet UI
-      this.statusText.setText('Connecting (local)...').setVisible(true);
+    if (useLocal || useDevnetAuto) {
+      // Local mode: auto-generate keypair + airdrop
+      // Devnet-auto: use provided keypair (already funded) or generate + airdrop
+      const modeLabel = useLocal ? 'local' : 'devnet-auto';
+      this.statusText.setText(`Connecting (${modeLabel})...`).setVisible(true);
       this.wallet = new WalletProvider(this.config.rpcUrl);
-      this.wallet.useLocalKeypair();
+
+      // Accept pre-funded keypair via ?key=<base58-secret-key>
+      const keyParam = new URLSearchParams(window.location.search).get('key');
+      if (keyParam) {
+        try {
+          const secretKey = bs58.decode(keyParam);
+          this.wallet.useLocalKeypair(Keypair.fromSecretKey(secretKey));
+          console.log('[Wallet] Using provided keypair:', this.wallet.publicKey.toBase58());
+        } catch (err: any) {
+          this.statusText.setText(`Invalid key param: ${err.message}`);
+          return;
+        }
+      } else {
+        this.wallet.useLocalKeypair();
+      }
+
       this.wallet.onTx = (label, sig, status) => this.txLog.add(label, sig, status);
-      this.wallet.requestAirdrop().then(() => {
-        this.setupAnchorProvider();
-        this.onWalletConnected(pendingRoomCode);
-      }).catch((err: any) => {
-        this.statusText.setText(`Airdrop failed: ${err.message}`);
-      });
+
+      if (keyParam) {
+        // Already funded — skip airdrop
+        this.wallet.getBalance().then(bal => {
+          console.log(`[Wallet] Balance: ${bal} SOL`);
+          if (bal < 0.01) {
+            this.statusText.setText('Key has insufficient SOL (need ≥0.01)');
+            return;
+          }
+          this.setupAnchorProvider();
+          this.onWalletConnected(pendingRoomCode);
+        });
+      } else {
+        // No key provided — try airdrop (works on localnet)
+        this.wallet.requestAirdrop().then(() => {
+          this.setupAnchorProvider();
+          this.onWalletConnected(pendingRoomCode);
+        }).catch((err: any) => {
+          this.statusText.setText(`Airdrop failed: ${err.message}`);
+        });
+      }
       return;
     }
 
@@ -530,6 +566,7 @@ export class LobbyScene extends Phaser.Scene {
 
     // Show room code
     const roomCode = this.worldPda!.toBase58();
+    console.log(`[Lobby] Room code: ${roomCode}`);
     this.roomCodeText.setText(`Room: ${roomCode}`).setVisible(true);
 
     // Copy button
@@ -583,6 +620,14 @@ export class LobbyScene extends Phaser.Scene {
 
   private async onStartMatch(): Promise<void> {
     if (!this.worldPda || !this.isHost) return;
+
+    // Stop polling to prevent race condition — poller could see isActive
+    // and transition before delegation completes, leaving host on L1.
+    if (this.pollInterval !== null) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    }
+
     try {
       const spawnPositions = [
         [50000, 132000],
@@ -590,6 +635,8 @@ export class LobbyScene extends Phaser.Scene {
         [80000, 100000],
         [176000, 100000],
       ];
+
+      this.statusText.setText('Starting match...').setVisible(true);
 
       // Start match on L1 — this sets is_active=true
       const startMatch = await ApplySystem({
@@ -617,10 +664,22 @@ export class LobbyScene extends Phaser.Scene {
           console.warn('[Lobby] Delegation failed, staying on L1:', err.message);
         }
       }
-      // Polling will detect is_active and transition
+
+      // Host transitions directly — no polling needed
+      this.cleanup();
+      this.scene.start('OnlineArena', {
+        wallet: this.wallet,
+        config: this.config,
+        worldPda: this.worldPda,
+        entities: this.entities,
+        pdas: this.pdas,
+        playerIndex: this.playerIndex,
+      });
     } catch (err: any) {
       console.warn('Start match failed:', err.message);
       this.statusText.setText(`Start failed: ${err.message}`).setVisible(true);
+      // Restart polling on failure so host can retry
+      this.startPolling();
     }
   }
 
@@ -657,13 +716,21 @@ export class LobbyScene extends Phaser.Scene {
       this.erConnection = new Connection(this.config.erRpcUrl, 'confirmed');
     }
 
+    const DELEGATION_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
+
     this.pollInterval = window.setInterval(async () => {
       if (!this.worldPda) return;
       try {
         const acct = await this.wallet.connection.getAccountInfo(this.pdas.matchState);
 
         let ms;
+        let accountDelegated = false;
+
         if (acct && acct.data.length > 8) {
+          // Check if account owner is delegation program (indicates ER delegation)
+          if (acct.owner.equals(DELEGATION_PROGRAM)) {
+            accountDelegated = true;
+          }
           try {
             ms = deserializeMatchState(new Uint8Array(acct.data));
           } catch {
@@ -671,14 +738,28 @@ export class LobbyScene extends Phaser.Scene {
           }
         }
 
-        if (!ms && this.erConnection) {
+        // If account is delegated, switch to ER for live data
+        if (accountDelegated && this.erConnection && !this.delegated) {
+          this.delegated = true;
+          this.wallet.setErConnection(this.config.erRpcUrl!);
+          console.log('[Lobby] Detected delegation (account owner = DelegationProgram), switching to ER');
+        }
+
+        // If delegated, always prefer ER data (L1 data is frozen)
+        if (this.delegated && this.erConnection) {
+          const erAcct = await this.erConnection.getAccountInfo(this.pdas.matchState);
+          if (erAcct && erAcct.data.length > 8) {
+            ms = deserializeMatchState(new Uint8Array(erAcct.data));
+          }
+        } else if (!ms && this.erConnection) {
+          // Fallback: try ER if L1 deserialization failed
           const erAcct = await this.erConnection.getAccountInfo(this.pdas.matchState);
           if (erAcct) {
             ms = deserializeMatchState(new Uint8Array(erAcct.data));
             if (!this.delegated) {
               this.delegated = true;
               this.wallet.setErConnection(this.config.erRpcUrl!);
-              console.log('[Lobby] Detected delegation, switching to ER');
+              console.log('[Lobby] Detected delegation via ER fallback, switching to ER');
             }
           }
         }
@@ -694,6 +775,14 @@ export class LobbyScene extends Phaser.Scene {
         }
 
         if (ms.isActive && !ms.isLobby) {
+          // If ER is configured, wait for delegation before transitioning.
+          // The host delegates after startMatch — joiner must wait for
+          // account owner to change to delegation program before proceeding.
+          if (this.config.erRpcUrl && !this.delegated) {
+            this.statusText.setText('Waiting for delegation...').setVisible(true);
+            return;
+          }
+
           if (!this.wallet.erConnection && this.config.erRpcUrl && this.delegated) {
             this.wallet.setErConnection(this.config.erRpcUrl);
           }

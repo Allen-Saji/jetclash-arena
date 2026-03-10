@@ -344,12 +344,9 @@ export class OnlineArenaScene extends Phaser.Scene {
 
     const useER = this.erConnection !== this.wallet.connection;
     if (useER && this.config.erWsUrl) {
-      // ER with WebSocket subscriptions + polling fallback
       this.stateSubscriber.startWebSocket(this.config.erWsUrl);
-      this.stateSubscriber.startPolling(200); // 5Hz fallback
-      console.log(`[StateSync] WS on ${this.config.erWsUrl} + polling fallback`);
+      console.log(`[StateSync] WS on ${this.config.erWsUrl}`);
     } else {
-      // L1 or ER without WS — poll at 10Hz
       this.stateSubscriber.startPolling(100);
       console.log(`[StateSync] Polling at 10Hz (${useER ? 'ER' : 'L1'})`);
     }
@@ -712,11 +709,15 @@ export class OnlineArenaScene extends Phaser.Scene {
 
   /**
    * Host (player 0) cranks the game loop at 10Hz.
-   * Crank TXs are silent in TxLog to avoid spam.
+   * Each tick system is sent as a separate TX for reliability.
    */
+  private crankTxCount = 0;
+
   private startCrank(): void {
     this.buildCrankInstructions().then(() => {
       console.log('[Crank] Instructions built, starting 10Hz loop');
+      // Confirm first crank TX to catch errors early
+      this.sendCrankWithConfirm();
     }).catch(err => {
       console.warn('[Crank] Failed to build instructions:', err.message);
     });
@@ -729,34 +730,53 @@ export class OnlineArenaScene extends Phaser.Scene {
         const bh = (await this.erConnection.getLatestBlockhash()).blockhash;
         const ixs = this.crankInstructions;
 
-        const batchTx = new Transaction();
-        for (const ix of ixs) batchTx.add(ix);
-        batchTx.feePayer = this.wallet.publicKey;
-        batchTx.recentBlockhash = bh;
-        batchTx.sign(this.wallet.keypair);
-        const serialized = batchTx.serialize();
-
-        if (serialized.length <= 1232) {
-          this.erConnection.sendRawTransaction(serialized, { skipPreflight: true })
-            .catch((e) => console.warn('[Crank] TX failed:', e.message?.slice(0, 80)));
-        } else {
-          for (let batch = 0; batch < 2; batch++) {
-            const tx = new Transaction();
-            tx.add(ixs[batch * 2]);
-            tx.add(ixs[batch * 2 + 1]);
-            tx.feePayer = this.wallet.publicKey;
-            tx.recentBlockhash = bh;
-            tx.sign(this.wallet.keypair);
-            this.erConnection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
-              .catch((e) => console.warn('[Crank] TX failed:', e.message?.slice(0, 80)));
-          }
+        // Send each system as individual TX for reliability
+        for (const ix of ixs) {
+          const tx = new Transaction();
+          tx.add(ix);
+          tx.feePayer = this.wallet.publicKey;
+          tx.recentBlockhash = bh;
+          tx.sign(this.wallet.keypair);
+          this.erConnection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
+            .then(() => { this.crankTxCount++; })
+            .catch((e) => console.warn('[Crank] TX send error:', e.message?.slice(0, 120)));
         }
       } catch (err: any) {
-        console.warn('[Crank] Error:', err.message?.slice(0, 80));
+        console.warn('[Crank] Error:', err.message?.slice(0, 120));
       } finally {
         this.crankBusy = false;
       }
     }, 100); // 10Hz
+  }
+
+  /** Send first crank TX with confirmation to detect execution errors */
+  private async sendCrankWithConfirm(): Promise<void> {
+    if (!this.crankInstructions) return;
+    try {
+      const bh = await this.erConnection.getLatestBlockhash();
+      const ix = this.crankInstructions[0]; // tick-physics
+      const tx = new Transaction();
+      tx.add(ix);
+      tx.feePayer = this.wallet.publicKey;
+      tx.recentBlockhash = bh.blockhash;
+      tx.sign(this.wallet.keypair);
+      const sig = await this.erConnection.sendRawTransaction(tx.serialize(), { skipPreflight: false });
+      console.log('[Crank] First TX sig:', sig.slice(0, 16) + '..');
+      const result = await this.erConnection.confirmTransaction(
+        { signature: sig, blockhash: bh.blockhash, lastValidBlockHeight: bh.lastValidBlockHeight },
+        'confirmed',
+      );
+      if (result.value.err) {
+        console.error('[Crank] First TX FAILED on-chain:', JSON.stringify(result.value.err));
+      } else {
+        console.log('[Crank] First TX confirmed OK');
+      }
+    } catch (err: any) {
+      console.error('[Crank] First TX error:', err.message?.slice(0, 200));
+      if (err.logs) {
+        console.error('[Crank] TX logs:', err.logs.slice(-5).join('\n'));
+      }
+    }
   }
 
   // --- Visual creation ---
